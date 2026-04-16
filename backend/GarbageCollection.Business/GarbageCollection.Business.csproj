@@ -10,6 +10,8 @@
     <!-- Cần để dùng IFormFile trong CloudinaryService -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="CloudinaryDotNet" Version="1.26.2" />
+    <PackageReference Include="Google.Apis.Auth" Version="1.73.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>

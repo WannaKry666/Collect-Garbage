@@ -1,47 +1,109 @@
 ﻿using CloudinaryDotNet;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi.Models;
+using GarbageCollection.Business.Helpers;
+using GarbageCollection.Business.Interfaces;
+using GarbageCollection.Business.Services;
 using GarbageCollection.Common.Settings;
 using GarbageCollection.DataAccess.Data;
 using GarbageCollection.DataAccess.Interfaces;
 using GarbageCollection.DataAccess.Repositories;
-using GarbageCollection.Business.Interfaces;
-using GarbageCollection.Business.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using System.Reflection;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ── Database ──────────────────────────────────────────────────────────────────
+// ── 1. Database ──────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        o => o.MigrationsAssembly("GarbageCollection.DataAccess")));
 
-// ── Cloudinary ────────────────────────────────────────────────────────────────
-builder.Services.Configure<CloudinarySettings>(
-    builder.Configuration.GetSection("Cloudinary"));
+// ── 2. Configuration Settings ────────────────────────────────────────────────
+builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("Cloudinary"));
+var jwtSection = builder.Configuration.GetSection("Jwt");
+var secretKey = jwtSection["SecretKey"] ?? throw new Exception("Jwt:SecretKey missing");
 
-// ── Dependency Injection ──────────────────────────────────────────────────────
-builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
+// ── 3. Identity & Access (Cần thiết cho Cookie/Auth) ─────────────────────────
+builder.Services.AddHttpContextAccessor(); // Quan trọng để truy cập HttpContext trong Service
+
+// ── 4. Repositories & Services (DI) ──────────────────────────────────────────
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IWasteReportRepository, WasteReportRepository>();
-builder.Services.AddScoped<IWasteReportService, WasteReportService>();
 
-// ── API ───────────────────────────────────────────────────────────────────────
+builder.Services.AddSingleton<JwtHelper>();
+builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
+builder.Services.AddScoped<IWasteReportService, WasteReportService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+
+// ── 5. JWT Authentication ────────────────────────────────────────────────────
+builder.Services
+    .AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        options.RequireHttpsMetadata = false; // Set true khi lên production
+        options.SaveToken = true;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtSection["Issuer"],
+
+            ValidateAudience = true,
+            ValidAudience = jwtSection["Audience"],
+
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero // Loại bỏ thời gian trễ mặc định (5p)
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                // Ưu tiên lấy token từ Cookie (dành cho Web FE)
+                if (context.Request.Cookies.TryGetValue("accessToken", out var cookieToken))
+                {
+                    context.Token = cookieToken;
+                }
+                // Nếu không có cookie, JwtBearer sẽ tự động tìm trong header "Authorization: Bearer ..."
+                return Task.CompletedTask;
+            }
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+// ── 6. CORS (Cực kỳ quan trọng khi dùng Cookie) ──────────────────────────────
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+        policy.WithOrigins("http://localhost:3000") // Đảm bảo khớp với URL của React/Next.js
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials()); // BẮT BUỘC có cái này để gửi/nhận Cookie
+});
+
+// ── 7. Controllers & Swagger ─────────────────────────────────────────────────
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "GarbageCollection Waste Collection API",
-        Version = "v1",
-        Description = "API quản lý báo cáo rác thải - GarbageCollection"
-    });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "GarbageCollection API", Version = "v1" });
 
-    // Bật XML comments từ file .xml được sinh ra khi build
+    // Hỗ trợ XML Comment (đảm bảo file .xml tồn tại)
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    c.IncludeXmlComments(xmlPath);
+    if (File.Exists(xmlPath)) c.IncludeXmlComments(xmlPath);
 
-    // JWT Bearer – dùng khi đã tích hợp authentication
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -49,7 +111,7 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "Bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Nhập token theo định dạng: Bearer {token}"
+        Description = "Nhập token: {token}"
     });
 
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -57,29 +119,25 @@ builder.Services.AddSwaggerGen(c =>
         {
             new OpenApiSecurityScheme
             {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
             },
             Array.Empty<string>()
         }
     });
 });
 
-// Giới hạn kích thước file upload (tối đa 10 MB)
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
-{
-    o.MultipartBodyLengthLimit = 10 * 1024 * 1024;
-});
+    o.MultipartBodyLengthLimit = 10 * 1024 * 1024);
 
 var app = builder.Build();
 
-// ── Seed dữ liệu test ─────────────────────────────────────────────────────────
+// ── 8. Pipeline Middleware ───────────────────────────────────────────────────
+
+// Seeding (Nên tách ra một class riêng nhưng tạm thời để đây cũng được)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    // db.Database.Migrate(); // Tự động chạy Migration nếu cần
     if (!db.Citizens.Any())
     {
         db.Citizens.Add(new GarbageCollection.Common.Models.Citizen
@@ -92,27 +150,29 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// ── Global Exception Handler ──────────────────────────────────────────────────
 app.UseExceptionHandler(err => err.Run(async ctx =>
 {
     var ex = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
     ctx.Response.StatusCode = 500;
     ctx.Response.ContentType = "application/json";
-    await ctx.Response.WriteAsJsonAsync(new
-    {
-        error = ex?.Message,
-        detail = ex?.InnerException?.Message
-    });
+    await ctx.Response.WriteAsJsonAsync(new { error = ex?.Message });
 }));
 
-// Swagger luôn bật để tiện test (giới hạn lại khi deploy production)
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "GarbageCollection Waste API v1");
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "GarbageCollection API v1");
     c.RoutePrefix = "swagger";
 });
 
-app.UseAuthorization();
+app.UseHttpsRedirection();
+
+app.UseCors("AllowFrontend");
+
+// Thứ tự này KHÔNG ĐƯỢC SAI
+app.UseAuthentication(); // Ai là người đang truy cập?
+app.UseAuthorization();  // Người đó có quyền làm gì?
+
 app.MapControllers();
+
 app.Run();

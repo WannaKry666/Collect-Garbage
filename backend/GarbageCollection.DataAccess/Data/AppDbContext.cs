@@ -12,6 +12,8 @@ namespace GarbageCollection.DataAccess.Data
 
         public DbSet<Citizen> Citizens { get; set; }
         public DbSet<WasteReport> WasteReports { get; set; }
+        public DbSet<User> Users => Set<User>();
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -61,6 +63,52 @@ namespace GarbageCollection.DataAccess.Data
                       .WithMany(c => c.WasteReports)
                       .HasForeignKey(e => e.CitizenId)
                       .OnDelete(DeleteBehavior.Cascade);
+            });
+            modelBuilder.Entity<User>(e =>
+            {
+                e.ToTable("users");
+                e.HasKey(u => u.Id);
+
+                e.Property(u => u.Id).HasColumnName("id");
+                e.Property(u => u.Email).HasColumnName("email").IsRequired().HasMaxLength(320);
+                e.Property(u => u.EmailVerified).HasColumnName("email_verified");
+                e.Property(u => u.GoogleId).HasColumnName("google_id").HasMaxLength(128);
+                e.Property(u => u.Provider).HasColumnName("provider").IsRequired().HasMaxLength(64);
+                e.Property(u => u.FullName).HasColumnName("full_name").IsRequired().HasMaxLength(256);
+                e.Property(u => u.AvatarUrl).HasColumnName("avatar_url").HasMaxLength(1024);
+                e.Property(u => u.PasswordHash).HasColumnName("password_hash").HasMaxLength(512);
+                e.Property(u => u.IsBanned).HasColumnName("is_banned");
+                e.Property(u => u.IsLogin).HasColumnName("is_login");
+                e.Property(u => u.LoginTerm).HasColumnName("login_term");
+                e.Property(u => u.Role).HasColumnName("role").IsRequired().HasMaxLength(64);
+                e.Property(u => u.Address).HasColumnName("address").HasMaxLength(512);
+                e.Property(u => u.CreatedAt).HasColumnName("created_at");
+                e.Property(u => u.UpdatedAt).HasColumnName("updated_at");
+
+                e.HasIndex(u => u.Email).IsUnique();
+                e.HasIndex(u => u.GoogleId);
+            });
+
+            // ── RefreshToken ─────────────────────────────────────────────────
+            modelBuilder.Entity<RefreshToken>(e =>
+            {
+                e.ToTable("refresh_tokens");
+                e.HasKey(rt => rt.Id);
+
+                e.Property(rt => rt.Id).HasColumnName("id");
+                e.Property(rt => rt.UserId).HasColumnName("user_id");
+                e.Property(rt => rt.TokenHash).HasColumnName("token_hash").IsRequired().HasMaxLength(128);
+                e.Property(rt => rt.Email).HasColumnName("email").IsRequired().HasMaxLength(320);
+                e.Property(rt => rt.ExpiresAt).HasColumnName("expires_at");
+                e.Property(rt => rt.IsRevoked).HasColumnName("is_revoked");
+                e.Property(rt => rt.CreatedAt).HasColumnName("created_at");
+
+                e.HasOne(rt => rt.User)
+                 .WithMany(u => u.RefreshTokens)
+                 .HasForeignKey(rt => rt.UserId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasIndex(rt => rt.TokenHash).IsUnique();
             });
         }
     }
