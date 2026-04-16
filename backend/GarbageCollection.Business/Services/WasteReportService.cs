@@ -47,9 +47,9 @@ namespace GarbageCollection.Business.Services
             return report is null ? null : MapToResponse(report);
         }
 
-        public async Task<IEnumerable<WasteReportResponseDto>> GetReportsByCitizenAsync(int citizenId)
+        public async Task<IEnumerable<WasteReportResponseDto>> GetReportsByCitizenAsync(int citizenId, ReportStatus? status = null)
         {
-            var reports = await _reportRepository.GetByCitizenIdAsync(citizenId);
+            var reports = await _reportRepository.GetByCitizenIdAsync(citizenId, status);
             return reports.Select(MapToResponse);
         }
 
@@ -63,7 +63,8 @@ namespace GarbageCollection.Business.Services
             WasteTypes = report.WasteTypes.Select(w => w.ToString()).ToList(),
             Size = report.Size.ToString(),
             Status = report.Status.ToString(),
-            CreatedAt = report.CreatedAt
+            CreatedAt = report.CreatedAt,
+            UpdatedAt = report.UpdatedAt
         };
     }
 }

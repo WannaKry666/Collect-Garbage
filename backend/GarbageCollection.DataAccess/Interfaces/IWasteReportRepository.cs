@@ -1,4 +1,5 @@
-﻿using GarbageCollection.Common.Models;
+﻿using GarbageCollection.Common.Enums;
+using GarbageCollection.Common.Models;
 
 namespace GarbageCollection.DataAccess.Interfaces
 {
@@ -6,7 +7,7 @@ namespace GarbageCollection.DataAccess.Interfaces
     {
         Task<WasteReport> CreateAsync(WasteReport report);
         Task<WasteReport?> GetByIdAsync(int id);
-        Task<IEnumerable<WasteReport>> GetByCitizenIdAsync(int citizenId);
+        Task<IEnumerable<WasteReport>> GetByCitizenIdAsync(int citizenId, ReportStatus? status = null);
         Task<WasteReport> UpdateAsync(WasteReport report);
     }
 }

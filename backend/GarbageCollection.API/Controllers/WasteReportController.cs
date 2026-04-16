@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using GarbageCollection.Common.DTOs.WasteReport;
+using GarbageCollection.Common.Enums;
 using GarbageCollection.Business.Interfaces;
 
 namespace GarbageCollection.API.Controllers
@@ -50,14 +51,16 @@ namespace GarbageCollection.API.Controllers
         }
 
         /// <summary>
-        /// Lấy toàn bộ báo cáo của Citizen đang đăng nhập.
+        /// Lấy danh sách báo cáo của Citizen đang đăng nhập.
         /// </summary>
+        /// <param name="status">Lọc theo trạng thái: Pending, Accepted, Assigned, Collected (bỏ trống = lấy tất cả)</param>
         [HttpGet("my-reports")]
         [ProducesResponseType(typeof(IEnumerable<WasteReportResponseDto>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetMyReports()
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> GetMyReports([FromQuery] ReportStatus? status = null)
         {
             var citizenId = GetCurrentCitizenId();
-            var results = await _wasteReportService.GetReportsByCitizenAsync(citizenId);
+            var results = await _wasteReportService.GetReportsByCitizenAsync(citizenId, status);
             return Ok(results);
         }
 

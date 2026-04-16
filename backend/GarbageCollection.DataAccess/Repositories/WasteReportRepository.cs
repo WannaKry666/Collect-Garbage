@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using GarbageCollection.Common.Enums;
 using GarbageCollection.Common.Models;
 using GarbageCollection.DataAccess.Data;
 using GarbageCollection.DataAccess.Interfaces;
@@ -28,11 +29,16 @@ namespace GarbageCollection.DataAccess.Repositories
                 .FirstOrDefaultAsync(r => r.Id == id);
         }
 
-        public async Task<IEnumerable<WasteReport>> GetByCitizenIdAsync(int citizenId)
+        public async Task<IEnumerable<WasteReport>> GetByCitizenIdAsync(int citizenId, ReportStatus? status = null)
         {
-            return await _context.WasteReports
+            var query = _context.WasteReports
                 .Include(r => r.Citizen)
-                .Where(r => r.CitizenId == citizenId)
+                .Where(r => r.CitizenId == citizenId);
+
+            if (status.HasValue)
+                query = query.Where(r => r.Status == status.Value);
+
+            return await query
                 .OrderByDescending(r => r.CreatedAt)
                 .ToListAsync();
         }

@@ -1,4 +1,5 @@
 ﻿using GarbageCollection.Common.DTOs.WasteReport;
+using GarbageCollection.Common.Enums;
 
 namespace GarbageCollection.Business.Interfaces
 {
@@ -6,6 +7,6 @@ namespace GarbageCollection.Business.Interfaces
     {
         Task<WasteReportResponseDto> CreateReportAsync(int citizenId, CreateWasteReportDto dto);
         Task<WasteReportResponseDto?> GetReportByIdAsync(int id);
-        Task<IEnumerable<WasteReportResponseDto>> GetReportsByCitizenAsync(int citizenId);
+        Task<IEnumerable<WasteReportResponseDto>> GetReportsByCitizenAsync(int citizenId, ReportStatus? status = null);
     }
 }
