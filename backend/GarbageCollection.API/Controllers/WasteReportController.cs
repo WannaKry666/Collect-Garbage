@@ -64,6 +64,22 @@ namespace GarbageCollection.API.Controllers
             return Ok(results);
         }
 
+        /// <summary>
+        /// Cập nhật trạng thái báo cáo theo luồng: Pending → Accepted → Assigned → Collected.
+        /// </summary>
+        /// <param name="id">ID của báo cáo</param>
+        /// <param name="dto">Trạng thái mới</param>
+        [HttpPatch("{id:int}/status")]
+        [ProducesResponseType(typeof(WasteReportResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateReportStatusDto dto)
+        {
+            // TODO: Kiểm tra role — chỉ Enterprise/Collector mới được đổi status
+            var result = await _wasteReportService.UpdateStatusAsync(id, dto);
+            return Ok(result);
+        }
+
         // Tạm thời hardcode, sẽ thay bằng JWT claim sau
         private static int GetCurrentCitizenId() => 1;
     }

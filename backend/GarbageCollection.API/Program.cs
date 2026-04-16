@@ -77,20 +77,20 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
 var app = builder.Build();
 
 // ── Seed dữ liệu test ─────────────────────────────────────────────────────────
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    if (!db.Citizens.Any())
+    using (var scope = app.Services.CreateScope())
     {
-        db.Citizens.Add(new GarbageCollection.Common.Models.Citizen
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        if (!db.Citizens.Any())
         {
-            FullName = "Test Citizen",
-            Email = "test@GarbageCollection.com",
-            TotalPoints = 0
-        });
-        db.SaveChanges();
+            db.Citizens.Add(new GarbageCollection.Common.Models.Citizen
+            {
+                FullName = "Test Citizen",
+                Email = "test@GarbageCollection.com",
+                TotalPoints = 0
+            });
+            db.SaveChanges();
+        }
     }
-}
 
 // ── Global Exception Handler ──────────────────────────────────────────────────
 app.UseExceptionHandler(err => err.Run(async ctx =>

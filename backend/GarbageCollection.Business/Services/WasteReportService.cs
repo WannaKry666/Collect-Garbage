@@ -53,6 +53,33 @@ namespace GarbageCollection.Business.Services
             return reports.Select(MapToResponse);
         }
 
+        public async Task<WasteReportResponseDto> UpdateStatusAsync(int reportId, UpdateReportStatusDto dto)
+        {
+            var report = await _reportRepository.GetByIdAsync(reportId)
+                ?? throw new KeyNotFoundException($"Không tìm thấy báo cáo với ID {reportId}.");
+
+            ValidateStatusTransition(report.Status, dto.NewStatus);
+
+            report.Status = dto.NewStatus;
+            var updated = await _reportRepository.UpdateAsync(report);
+            return MapToResponse(updated);
+        }
+
+        private static void ValidateStatusTransition(ReportStatus current, ReportStatus next)
+        {
+            var allowed = new Dictionary<ReportStatus, ReportStatus>
+            {
+                { ReportStatus.Pending,  ReportStatus.Accepted  },  // Enterprise accepts
+                { ReportStatus.Accepted, ReportStatus.Assigned  },  // Enterprise assigns Collector
+                { ReportStatus.Assigned, ReportStatus.Collected },  // Collector confirms
+            };
+
+            if (!allowed.TryGetValue(current, out var expected) || expected != next)
+                throw new InvalidOperationException(
+                    $"Không thể chuyển trạng thái từ '{current}' sang '{next}'. " +
+                    $"Trạng thái tiếp theo hợp lệ: '{(allowed.ContainsKey(current) ? allowed[current] : "không có")}'.");
+        }
+
         private static WasteReportResponseDto MapToResponse(WasteReport report) => new()
         {
             Id = report.Id,
