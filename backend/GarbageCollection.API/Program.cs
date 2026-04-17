@@ -9,25 +9,43 @@ using GarbageCollection.Business.Interfaces;
 using GarbageCollection.Business.Services;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using DotNetEnv;
+
+// ── 1. Nạp biến môi trường từ file .env ─────────────────────────────────────────
+Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ── Database ──────────────────────────────────────────────────────────────────
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+// Bắt buộc .NET đọc thêm cấu hình từ Environment Variables để đè lên appsettings.json
+builder.Configuration.AddEnvironmentVariables();
 
-// ── Cloudinary ────────────────────────────────────────────────────────────────
+// ── 2. Database Configuration ──────────────────────────────────────────────────
+// Chuỗi kết nối sẽ tự động lấy từ biến ConnectionStrings__DefaultConnection trong .env
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(connectionString));
+
+// ── 3. Cloudinary Configuration ────────────────────────────────────────────────
+// Tự động map các biến Cloudinary__CloudName, Cloudinary__ApiKey... từ .env
 builder.Services.Configure<CloudinarySettings>(
     builder.Configuration.GetSection("Cloudinary"));
 
-// ── Dependency Injection ──────────────────────────────────────────────────────
+// ── 4. Dependency Injection (DI) ──────────────────────────────────────────────
 builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 builder.Services.AddScoped<IWasteReportRepository, WasteReportRepository>();
 builder.Services.AddScoped<IWasteReportService, WasteReportService>();
 
-// ── API ───────────────────────────────────────────────────────────────────────
+// ── 5. Cấu hình API & Controller ───────────────────────────────────────────────
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
+// Giới hạn kích thước file upload (tối đa 10 MB)
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
+{
+    o.MultipartBodyLengthLimit = 10 * 1024 * 1024;
+});
+
+// ── 6. Swagger / OpenAPI Configuration ─────────────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -41,9 +59,12 @@ builder.Services.AddSwaggerGen(c =>
     // Bật XML comments từ file .xml được sinh ra khi build
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-    c.IncludeXmlComments(xmlPath);
+    if (File.Exists(xmlPath))
+    {
+        c.IncludeXmlComments(xmlPath);
+    }
 
-    // JWT Bearer – dùng khi đã tích hợp authentication
+    // Cấu hình JWT Bearer Token cho Swagger
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -71,18 +92,17 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Giới hạn kích thước file upload (tối đa 10 MB)
-builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
-{
-    o.MultipartBodyLengthLimit = 10 * 1024 * 1024;
-});
-
 var app = builder.Build();
 
-// ── Seed dữ liệu test ─────────────────────────────────────────────────────────
-    using (var scope = app.Services.CreateScope())
+// ── 7. Seed dữ liệu test ───────────────────────────────────────────────────────
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
     {
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var db = services.GetRequiredService<AppDbContext>();
+
+        // Kiểm tra nếu chưa có dữ liệu Citizen thì thêm mới
         if (!db.Citizens.Any())
         {
             db.Citizens.Add(new GarbageCollection.Common.Models.Citizen
@@ -94,8 +114,15 @@ var app = builder.Build();
             db.SaveChanges();
         }
     }
+    catch (Exception ex)
+    {
+        // Ghi log nếu lỗi kết nối hoặc seed data
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Đã xảy ra lỗi khi seed dữ liệu vào Database.");
+    }
+}
 
-// ── Global Exception Handler ──────────────────────────────────────────────────
+// ── 8. Global Exception Handler ────────────────────────────────────────────────
 app.UseExceptionHandler(err => err.Run(async ctx =>
 {
     var ex = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
@@ -103,10 +130,10 @@ app.UseExceptionHandler(err => err.Run(async ctx =>
     ctx.Response.ContentType = "application/json";
     ctx.Response.StatusCode = ex switch
     {
-        KeyNotFoundException   => StatusCodes.Status404NotFound,
+        KeyNotFoundException => StatusCodes.Status404NotFound,
         InvalidOperationException => StatusCodes.Status400BadRequest,
-        ArgumentException      => StatusCodes.Status400BadRequest,
-        _                      => StatusCodes.Status500InternalServerError
+        ArgumentException => StatusCodes.Status400BadRequest,
+        _ => StatusCodes.Status500InternalServerError
     };
 
     await ctx.Response.WriteAsJsonAsync(new GarbageCollection.Common.DTOs.ApiResponse<object>
@@ -117,7 +144,8 @@ app.UseExceptionHandler(err => err.Run(async ctx =>
     });
 }));
 
-// Swagger luôn bật để tiện test (giới hạn lại khi deploy production)
+// ── 9. Middleware Pipeline ─────────────────────────────────────────────────────
+// Swagger luôn bật để tiện test
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -127,4 +155,6 @@ app.UseSwaggerUI(c =>
 
 app.UseAuthorization();
 app.MapControllers();
+
+// Khởi chạy ứng dụng
 app.Run();
