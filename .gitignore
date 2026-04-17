@@ -23,7 +23,7 @@ packages/
 ## Logs
 *.log
 logs/
-
+PROJECT_OVERVIEW.md
 ## Environment / secrets
 appsettings.Development.json
 .env
