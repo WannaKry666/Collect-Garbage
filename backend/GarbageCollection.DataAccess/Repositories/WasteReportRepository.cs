@@ -43,6 +43,22 @@ namespace GarbageCollection.DataAccess.Repositories
                 .ToListAsync();
         }
 
+        public async Task<(IEnumerable<WasteReport> Items, int Total)> GetByCitizenIdPagedAsync(int citizenId, int page, int limit)
+        {
+            var query = _context.WasteReports
+                .Include(r => r.Citizen)
+                .Where(r => r.CitizenId == citizenId)
+                .OrderByDescending(r => r.CreatedAt);
+
+            var total = await query.CountAsync();
+            var items = await query
+                .Skip((page - 1) * limit)
+                .Take(limit)
+                .ToListAsync();
+
+            return (items, total);
+        }
+
         public async Task<WasteReport> UpdateAsync(WasteReport report)
         {
             report.UpdatedAt = DateTime.UtcNow;

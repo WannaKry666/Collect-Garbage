@@ -1,4 +1,5 @@
-﻿using GarbageCollection.Common.DTOs.WasteReport;
+﻿using GarbageCollection.Common.DTOs;
+using GarbageCollection.Common.DTOs.WasteReport;
 using GarbageCollection.Common.Enums;
 using GarbageCollection.Common.Models;
 using GarbageCollection.DataAccess.Interfaces;
@@ -51,6 +52,22 @@ namespace GarbageCollection.Business.Services
         {
             var reports = await _reportRepository.GetByCitizenIdAsync(citizenId, status);
             return reports.Select(MapToResponse);
+        }
+
+        public async Task<CitizenReportsResult> GetCitizenReportsPagedAsync(int citizenId, int page, int limit)
+        {
+            var (items, total) = await _reportRepository.GetByCitizenIdPagedAsync(citizenId, page, limit);
+            return new CitizenReportsResult
+            {
+                Reports = items.Select(MapToResponse).ToList(),
+                Pagination = new PaginationMeta
+                {
+                    Page = page,
+                    Limit = limit,
+                    Total = total,
+                    TotalPages = (int)Math.Ceiling((double)total / limit)
+                }
+            };
         }
 
         public async Task<WasteReportResponseDto> UpdateStatusAsync(int reportId, ReportStatus newStatus)

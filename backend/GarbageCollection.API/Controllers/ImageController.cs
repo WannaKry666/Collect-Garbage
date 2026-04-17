@@ -5,7 +5,7 @@ using GarbageCollection.Business.Interfaces;
 namespace GarbageCollection.API.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/v1/[controller]")]
     public class ImageController : ControllerBase
     {
         private readonly ICloudinaryService _cloudinaryService;
@@ -25,10 +25,10 @@ namespace GarbageCollection.API.Controllers
         public async Task<IActionResult> Upload([FromForm] IList<IFormFile> images)
         {
             if (images == null || images.Count == 0)
-                return BadRequest(ApiResponse<object>.Fail("Vui lòng chọn ít nhất 1 ảnh."));
+                return BadRequest(ApiResponse<object>.Fail("Vui lòng chọn ít nhất 1 ảnh.", "VALIDATION_ERROR"));
 
             if (images.Count > 3)
-                return BadRequest(ApiResponse<object>.Fail("Tối đa 3 ảnh mỗi lần upload."));
+                return BadRequest(ApiResponse<object>.Fail("Tối đa 3 ảnh mỗi lần upload.", "VALIDATION_ERROR"));
 
             var urls = await _cloudinaryService.UploadImagesAsync(images, "waste-reports");
             return Ok(ApiResponse<List<string>>.Ok(urls));

@@ -18,7 +18,9 @@ using System.Text;
 using System.Text.Json;
 =======
 >>>>>>> 98025b8 (feat: add respone format api)
+using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.HttpOverrides;
 using DotNetEnv;
 
 // ── 1. Nạp biến môi trường từ file .env ─────────────────────────────────────────
@@ -181,14 +183,42 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.Configure<CloudinarySettings>(
     builder.Configuration.GetSection("Cloudinary"));
 
-// ── 4. Dependency Injection (DI) ──────────────────────────────────────────────
+// ── 4. CORS ────────────────────────────────────────────────────────────────────
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins(
+                // Lovable frontends
+                "https://ecoconnect-citizen.lovable.app",
+                "https://eco-connect-admin-re.lovable.app",
+                "https://eco-connect-collector.lovable.app",
+                "https://eco-conect-landing-page.lovable.app",
+                // Railway backend (Swagger UI)
+                "https://collect-garbage-production.up.railway.app",
+                // Local dev
+                "http://localhost:3000",
+                "http://localhost:5173",
+                "http://localhost:4200"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+
+// ── 5. Dependency Injection (DI) ──────────────────────────────────────────────
 builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 builder.Services.AddScoped<IWasteReportRepository, WasteReportRepository>();
 builder.Services.AddScoped<IWasteReportService, WasteReportService>();
 
 // ── 5. Cấu hình API & Controller ───────────────────────────────────────────────
 builder.Services.AddControllers()
-    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+    .AddJsonOptions(o =>
+    {
+        o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        o.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+    });
 
 // Giới hạn kích thước file upload (tối đa 10 MB)
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
@@ -289,6 +319,12 @@ using (var scope = app.Services.CreateScope())
 }
 
 // ── 8. Global Exception Handler ────────────────────────────────────────────────
+var exceptionJsonOptions = new JsonSerializerOptions
+{
+    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+    Converters = { new JsonStringEnumConverter() }
+};
+
 app.UseExceptionHandler(err => err.Run(async ctx =>
 >>>>>>> 277178b (feat: add evn)
 {
@@ -327,18 +363,32 @@ app.UseExceptionHandler(err => err.Run(async context =>
     ctx.Response.StatusCode = ex switch
 >>>>>>> 98025b8 (feat: add respone format api)
     {
-        KeyNotFoundException => StatusCodes.Status404NotFound,
+        KeyNotFoundException      => StatusCodes.Status404NotFound,
         InvalidOperationException => StatusCodes.Status400BadRequest,
-        ArgumentException => StatusCodes.Status400BadRequest,
-        _ => StatusCodes.Status500InternalServerError
+        ArgumentException         => StatusCodes.Status400BadRequest,
+        _                         => StatusCodes.Status500InternalServerError
     };
 
-    await ctx.Response.WriteAsJsonAsync(new GarbageCollection.Common.DTOs.ApiResponse<object>
+    var errorCode = ctx.Response.StatusCode switch
     {
-        Success = false,
-        Data = null,
-        Message = ex?.Message ?? "Đã xảy ra lỗi không xác định."
-    });
+        404 => "NOT_FOUND",
+        400 => "BAD_REQUEST",
+        _   => "INTERNAL_SERVER_ERROR"
+    };
+
+    await ctx.Response.WriteAsJsonAsync(
+        new GarbageCollection.Common.DTOs.ApiResponse<object>
+        {
+            Status  = "failed",
+            Message = ex?.Message ?? "Đã xảy ra lỗi không xác định.",
+            Data    = null,
+            Error   = new GarbageCollection.Common.DTOs.ApiError
+            {
+                Code        = errorCode,
+                Description = ex?.Message ?? "Unknown error"
+            }
+        },
+        exceptionJsonOptions);
 }));
 
 <<<<<<< HEAD
@@ -354,6 +404,14 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 
 =======
 // ── 9. Middleware Pipeline ─────────────────────────────────────────────────────
+// Cần cho Railway reverse proxy — giúp Swagger detect đúng scheme HTTPS
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
+
+app.UseCors("AllowFrontend");
+
 // Swagger luôn bật để tiện test
 >>>>>>> 277178b (feat: add evn)
 app.UseSwagger();
