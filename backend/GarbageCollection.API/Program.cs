@@ -13,8 +13,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
+<<<<<<< HEAD
 using System.Text;
 using System.Text.Json;
+=======
+>>>>>>> 98025b8 (feat: add respone format api)
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -43,6 +46,7 @@ var jwtSection = builder.Configuration.GetSection("Jwt");
 var secretKey = jwtSection["SecretKey"] 
     ?? throw new Exception("Jwt:SecretKey missing");
 
+<<<<<<< HEAD
 // ─────────────────────────────────────────────
 // 4. CORE SERVICES
 // ─────────────────────────────────────────────
@@ -152,6 +156,11 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
 // ─────────────────────────────────────────────
 // 8. SWAGGER
 // ─────────────────────────────────────────────
+=======
+// ── API ───────────────────────────────────────────────────────────────────────
+builder.Services.AddControllers()
+    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+>>>>>>> 98025b8 (feat: add respone format api)
 builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen(c =>
@@ -176,6 +185,7 @@ builder.Services.AddSwaggerGen(c =>
         In = ParameterLocation.Header
     });
 
+    c.UseInlineDefinitionsForEnums();
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -202,6 +212,7 @@ var app = builder.Build();
 // ─────────────────────────────────────────────
 using (var scope = app.Services.CreateScope())
 {
+<<<<<<< HEAD
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
     if (!db.Citizens.Any())
@@ -229,9 +240,24 @@ app.UseExceptionHandler(err => err.Run(async context =>
     context.Response.ContentType = "application/json";
 
     await context.Response.WriteAsJsonAsync(new
+=======
+    var ex = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+
+    ctx.Response.ContentType = "application/json";
+    ctx.Response.StatusCode = ex switch
+>>>>>>> 98025b8 (feat: add respone format api)
     {
-        error = ex?.Message,
-        detail = ex?.InnerException?.Message
+        KeyNotFoundException   => StatusCodes.Status404NotFound,
+        InvalidOperationException => StatusCodes.Status400BadRequest,
+        ArgumentException      => StatusCodes.Status400BadRequest,
+        _                      => StatusCodes.Status500InternalServerError
+    };
+
+    await ctx.Response.WriteAsJsonAsync(new GarbageCollection.Common.DTOs.ApiResponse<object>
+    {
+        Success = false,
+        Data = null,
+        Message = ex?.Message ?? "Đã xảy ra lỗi không xác định."
     });
 }));
 
