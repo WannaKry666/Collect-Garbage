@@ -61,7 +61,7 @@ builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 builder.Services.AddScoped<IWasteReportRepository, WasteReportRepository>();
 builder.Services.AddScoped<IWasteReportService, WasteReportService>();
 
-// ── 5. Cấu hình API & Controller ───────────────────────────────────────────────
+// ── 6. Cấu hình API & Controller ───────────────────────────────────────────────
 builder.Services.AddControllers()
     .AddJsonOptions(o =>
     {
@@ -75,7 +75,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
     o.MultipartBodyLengthLimit = 10 * 1024 * 1024;
 });
 
-// ── 6. Swagger / OpenAPI Configuration ─────────────────────────────────────────
+// ── 7. Swagger / OpenAPI Configuration ─────────────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -124,7 +124,7 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-// ── 7. Seed dữ liệu test ───────────────────────────────────────────────────────
+// ── 8. Seed dữ liệu test ───────────────────────────────────────────────────────
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -152,7 +152,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// ── 8. Global Exception Handler ────────────────────────────────────────────────
+// ── 9. Global Exception Handler ────────────────────────────────────────────────
 var exceptionJsonOptions = new JsonSerializerOptions
 {
     PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -194,7 +194,7 @@ app.UseExceptionHandler(err => err.Run(async ctx =>
         exceptionJsonOptions);
 }));
 
-// ── 9. Middleware Pipeline ─────────────────────────────────────────────────────
+// ── 10. Middleware Pipeline ────────────────────────────────────────────────────
 // Cần cho Railway reverse proxy — giúp Swagger detect đúng scheme HTTPS
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
@@ -214,5 +214,6 @@ app.UseSwaggerUI(c =>
 app.UseAuthorization();
 app.MapControllers();
 
-// Khởi chạy ứng dụng
-app.Run();
+// Khởi chạy ứng dụng — Railway inject biến PORT, cần bind đúng
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+app.Run($"http://0.0.0.0:{port}");
