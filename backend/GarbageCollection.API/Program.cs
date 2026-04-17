@@ -19,9 +19,14 @@ using System.Text.Json;
 =======
 >>>>>>> 98025b8 (feat: add respone format api)
 using System.Text.Json.Serialization;
+using DotNetEnv;
+
+// ── 1. Nạp biến môi trường từ file .env ─────────────────────────────────────────
+Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
+<<<<<<< HEAD
 // ─────────────────────────────────────────────
 // 1. ENV CONFIG
 // ─────────────────────────────────────────────
@@ -161,6 +166,38 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 >>>>>>> 98025b8 (feat: add respone format api)
+=======
+// Bắt buộc .NET đọc thêm cấu hình từ Environment Variables để đè lên appsettings.json
+builder.Configuration.AddEnvironmentVariables();
+
+// ── 2. Database Configuration ──────────────────────────────────────────────────
+// Chuỗi kết nối sẽ tự động lấy từ biến ConnectionStrings__DefaultConnection trong .env
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(connectionString));
+
+// ── 3. Cloudinary Configuration ────────────────────────────────────────────────
+// Tự động map các biến Cloudinary__CloudName, Cloudinary__ApiKey... từ .env
+builder.Services.Configure<CloudinarySettings>(
+    builder.Configuration.GetSection("Cloudinary"));
+
+// ── 4. Dependency Injection (DI) ──────────────────────────────────────────────
+builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
+builder.Services.AddScoped<IWasteReportRepository, WasteReportRepository>();
+builder.Services.AddScoped<IWasteReportService, WasteReportService>();
+
+// ── 5. Cấu hình API & Controller ───────────────────────────────────────────────
+builder.Services.AddControllers()
+    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
+// Giới hạn kích thước file upload (tối đa 10 MB)
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
+{
+    o.MultipartBodyLengthLimit = 10 * 1024 * 1024;
+});
+
+// ── 6. Swagger / OpenAPI Configuration ─────────────────────────────────────────
+>>>>>>> 277178b (feat: add evn)
 builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen(c =>
@@ -174,8 +211,16 @@ builder.Services.AddSwaggerGen(c =>
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath))
+<<<<<<< HEAD
         c.IncludeXmlComments(xmlPath);
 
+=======
+    {
+        c.IncludeXmlComments(xmlPath);
+    }
+
+    // Cấu hình JWT Bearer Token cho Swagger
+>>>>>>> 277178b (feat: add evn)
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -202,6 +247,7 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+<<<<<<< HEAD
 // ─────────────────────────────────────────────
 // 9. BUILD APP
 // ─────────────────────────────────────────────
@@ -211,6 +257,40 @@ var app = builder.Build();
 // 10. SEED DATA
 // ─────────────────────────────────────────────
 using (var scope = app.Services.CreateScope())
+=======
+var app = builder.Build();
+
+// ── 7. Seed dữ liệu test ───────────────────────────────────────────────────────
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var db = services.GetRequiredService<AppDbContext>();
+
+        // Kiểm tra nếu chưa có dữ liệu Citizen thì thêm mới
+        if (!db.Citizens.Any())
+        {
+            db.Citizens.Add(new GarbageCollection.Common.Models.Citizen
+            {
+                FullName = "Test Citizen",
+                Email = "test@GarbageCollection.com",
+                TotalPoints = 0
+            });
+            db.SaveChanges();
+        }
+    }
+    catch (Exception ex)
+    {
+        // Ghi log nếu lỗi kết nối hoặc seed data
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Đã xảy ra lỗi khi seed dữ liệu vào Database.");
+    }
+}
+
+// ── 8. Global Exception Handler ────────────────────────────────────────────────
+app.UseExceptionHandler(err => err.Run(async ctx =>
+>>>>>>> 277178b (feat: add evn)
 {
 <<<<<<< HEAD
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -247,10 +327,10 @@ app.UseExceptionHandler(err => err.Run(async context =>
     ctx.Response.StatusCode = ex switch
 >>>>>>> 98025b8 (feat: add respone format api)
     {
-        KeyNotFoundException   => StatusCodes.Status404NotFound,
+        KeyNotFoundException => StatusCodes.Status404NotFound,
         InvalidOperationException => StatusCodes.Status400BadRequest,
-        ArgumentException      => StatusCodes.Status400BadRequest,
-        _                      => StatusCodes.Status500InternalServerError
+        ArgumentException => StatusCodes.Status400BadRequest,
+        _ => StatusCodes.Status500InternalServerError
     };
 
     await ctx.Response.WriteAsJsonAsync(new GarbageCollection.Common.DTOs.ApiResponse<object>
@@ -261,6 +341,7 @@ app.UseExceptionHandler(err => err.Run(async context =>
     });
 }));
 
+<<<<<<< HEAD
 // ─────────────────────────────────────────────
 // 12. MIDDLEWARE PIPELINE
 // ─────────────────────────────────────────────
@@ -271,6 +352,10 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
         ForwardedHeaders.XForwardedProto
 });
 
+=======
+// ── 9. Middleware Pipeline ─────────────────────────────────────────────────────
+// Swagger luôn bật để tiện test
+>>>>>>> 277178b (feat: add evn)
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -287,6 +372,11 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+<<<<<<< HEAD
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 app.Run();
+=======
+// Khởi chạy ứng dụng
+app.Run();
+>>>>>>> 277178b (feat: add evn)
