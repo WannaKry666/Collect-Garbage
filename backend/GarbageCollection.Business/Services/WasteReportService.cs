@@ -53,14 +53,14 @@ namespace GarbageCollection.Business.Services
             return reports.Select(MapToResponse);
         }
 
-        public async Task<WasteReportResponseDto> UpdateStatusAsync(int reportId, UpdateReportStatusDto dto)
+        public async Task<WasteReportResponseDto> UpdateStatusAsync(int reportId, ReportStatus newStatus)
         {
             var report = await _reportRepository.GetByIdAsync(reportId)
                 ?? throw new KeyNotFoundException($"Không tìm thấy báo cáo với ID {reportId}.");
 
-            ValidateStatusTransition(report.Status, dto.NewStatus);
+            ValidateStatusTransition(report.Status, newStatus);
 
-            report.Status = dto.NewStatus;
+            report.Status = newStatus;
             var updated = await _reportRepository.UpdateAsync(report);
             return MapToResponse(updated);
         }

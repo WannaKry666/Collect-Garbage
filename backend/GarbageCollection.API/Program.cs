@@ -8,6 +8,7 @@ using GarbageCollection.DataAccess.Repositories;
 using GarbageCollection.Business.Interfaces;
 using GarbageCollection.Business.Services;
 using System.Reflection;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,7 +26,8 @@ builder.Services.AddScoped<IWasteReportRepository, WasteReportRepository>();
 builder.Services.AddScoped<IWasteReportService, WasteReportService>();
 
 // ── API ───────────────────────────────────────────────────────────────────────
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -52,6 +54,7 @@ builder.Services.AddSwaggerGen(c =>
         Description = "Nhập token theo định dạng: Bearer {token}"
     });
 
+    c.UseInlineDefinitionsForEnums();
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -96,12 +99,21 @@ var app = builder.Build();
 app.UseExceptionHandler(err => err.Run(async ctx =>
 {
     var ex = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
-    ctx.Response.StatusCode = 500;
+
     ctx.Response.ContentType = "application/json";
-    await ctx.Response.WriteAsJsonAsync(new
+    ctx.Response.StatusCode = ex switch
     {
-        error = ex?.Message,
-        detail = ex?.InnerException?.Message
+        KeyNotFoundException   => StatusCodes.Status404NotFound,
+        InvalidOperationException => StatusCodes.Status400BadRequest,
+        ArgumentException      => StatusCodes.Status400BadRequest,
+        _                      => StatusCodes.Status500InternalServerError
+    };
+
+    await ctx.Response.WriteAsJsonAsync(new GarbageCollection.Common.DTOs.ApiResponse<object>
+    {
+        Success = false,
+        Data = null,
+        Message = ex?.Message ?? "Đã xảy ra lỗi không xác định."
     });
 }));
 

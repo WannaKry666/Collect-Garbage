@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
+using GarbageCollection.Common.DTOs;
 using GarbageCollection.Business.Interfaces;
 
 namespace GarbageCollection.API.Controllers
@@ -19,18 +20,18 @@ namespace GarbageCollection.API.Controllers
         /// </summary>
         [HttpPost("upload")]
         [Consumes("multipart/form-data")]
-        [ProducesResponseType(typeof(List<string>), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<List<string>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Upload([FromForm] IList<IFormFile> images)
         {
             if (images == null || images.Count == 0)
-                return BadRequest(new { message = "Vui lòng chọn ít nhất 1 ảnh." });
+                return BadRequest(ApiResponse<object>.Fail("Vui lòng chọn ít nhất 1 ảnh."));
 
             if (images.Count > 3)
-                return BadRequest(new { message = "Tối đa 3 ảnh mỗi lần upload." });
+                return BadRequest(ApiResponse<object>.Fail("Tối đa 3 ảnh mỗi lần upload."));
 
             var urls = await _cloudinaryService.UploadImagesAsync(images, "waste-reports");
-            return Ok(new { imageUrls = urls });
+            return Ok(ApiResponse<List<string>>.Ok(urls));
         }
     }
 }
