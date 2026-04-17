@@ -13,11 +13,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
-<<<<<<< HEAD
 using System.Text;
 using System.Text.Json;
-=======
->>>>>>> 98025b8 (feat: add respone format api)
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -163,12 +160,9 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
 // ─────────────────────────────────────────────
 // 8. SWAGGER
 // ─────────────────────────────────────────────
-=======
 // ── API ───────────────────────────────────────────────────────────────────────
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
->>>>>>> 98025b8 (feat: add respone format api)
-=======
 // Bắt buộc .NET đọc thêm cấu hình từ Environment Variables để đè lên appsettings.json
 builder.Configuration.AddEnvironmentVariables();
 
@@ -212,7 +206,7 @@ builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 builder.Services.AddScoped<IWasteReportRepository, WasteReportRepository>();
 builder.Services.AddScoped<IWasteReportService, WasteReportService>();
 
-// ── 5. Cấu hình API & Controller ───────────────────────────────────────────────
+// ── 6. Cấu hình API & Controller ───────────────────────────────────────────────
 builder.Services.AddControllers()
     .AddJsonOptions(o =>
     {
@@ -226,8 +220,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
     o.MultipartBodyLengthLimit = 10 * 1024 * 1024;
 });
 
-// ── 6. Swagger / OpenAPI Configuration ─────────────────────────────────────────
->>>>>>> 277178b (feat: add evn)
+// ── 7. Swagger / OpenAPI Configuration ─────────────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddSwaggerGen(c =>
@@ -241,16 +234,13 @@ builder.Services.AddSwaggerGen(c =>
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath))
-<<<<<<< HEAD
         c.IncludeXmlComments(xmlPath);
 
-=======
     {
         c.IncludeXmlComments(xmlPath);
     }
 
     // Cấu hình JWT Bearer Token cho Swagger
->>>>>>> 277178b (feat: add evn)
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -277,7 +267,6 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-<<<<<<< HEAD
 // ─────────────────────────────────────────────
 // 9. BUILD APP
 // ─────────────────────────────────────────────
@@ -287,10 +276,9 @@ var app = builder.Build();
 // 10. SEED DATA
 // ─────────────────────────────────────────────
 using (var scope = app.Services.CreateScope())
-=======
 var app = builder.Build();
 
-// ── 7. Seed dữ liệu test ───────────────────────────────────────────────────────
+// ── 8. Seed dữ liệu test ───────────────────────────────────────────────────────
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
@@ -318,7 +306,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// ── 8. Global Exception Handler ────────────────────────────────────────────────
+// ── 9. Global Exception Handler ────────────────────────────────────────────────
 var exceptionJsonOptions = new JsonSerializerOptions
 {
     PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -326,9 +314,7 @@ var exceptionJsonOptions = new JsonSerializerOptions
 };
 
 app.UseExceptionHandler(err => err.Run(async ctx =>
->>>>>>> 277178b (feat: add evn)
 {
-<<<<<<< HEAD
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
     if (!db.Citizens.Any())
@@ -356,12 +342,10 @@ app.UseExceptionHandler(err => err.Run(async context =>
     context.Response.ContentType = "application/json";
 
     await context.Response.WriteAsJsonAsync(new
-=======
     var ex = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
 
     ctx.Response.ContentType = "application/json";
     ctx.Response.StatusCode = ex switch
->>>>>>> 98025b8 (feat: add respone format api)
     {
         KeyNotFoundException      => StatusCodes.Status404NotFound,
         InvalidOperationException => StatusCodes.Status400BadRequest,
@@ -391,19 +375,7 @@ app.UseExceptionHandler(err => err.Run(async context =>
         exceptionJsonOptions);
 }));
 
-<<<<<<< HEAD
-// ─────────────────────────────────────────────
-// 12. MIDDLEWARE PIPELINE
-// ─────────────────────────────────────────────
-app.UseForwardedHeaders(new ForwardedHeadersOptions
-{
-    ForwardedHeaders =
-        ForwardedHeaders.XForwardedFor |
-        ForwardedHeaders.XForwardedProto
-});
-
-=======
-// ── 9. Middleware Pipeline ─────────────────────────────────────────────────────
+// ── 10. Middleware Pipeline ────────────────────────────────────────────────────
 // Cần cho Railway reverse proxy — giúp Swagger detect đúng scheme HTTPS
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
@@ -413,7 +385,6 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 app.UseCors("AllowFrontend");
 
 // Swagger luôn bật để tiện test
->>>>>>> 277178b (feat: add evn)
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -430,11 +401,8 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-<<<<<<< HEAD
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
-app.Run();
-=======
-// Khởi chạy ứng dụng
-app.Run();
->>>>>>> 277178b (feat: add evn)
+// Khởi chạy ứng dụng — Railway inject biến PORT, cần bind đúng
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+app.Run($"http://0.0.0.0:{port}");
