@@ -2,22 +2,31 @@ namespace GarbageCollection.Common.DTOs
 {
     public class ApiResponse<T>
     {
-        public bool Success { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
         public T? Data { get; set; }
-        public string? Message { get; set; }
+        public ApiError? Error { get; set; }
 
-        public static ApiResponse<T> Ok(T data, string? message = null) => new()
+        public static ApiResponse<T> Ok(T data, string message = "success") => new()
         {
-            Success = true,
+            Status = "success",
+            Message = message,
             Data = data,
-            Message = message
+            Error = null
         };
 
-        public static ApiResponse<T> Fail(string message) => new()
+        public static ApiResponse<T> Fail(string message, string code = "ERROR", string? description = null) => new()
         {
-            Success = false,
+            Status = "failed",
+            Message = message,
             Data = default,
-            Message = message
+            Error = new ApiError { Code = code, Description = description ?? message }
         };
+    }
+
+    public class ApiError
+    {
+        public string Code { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
     }
 }

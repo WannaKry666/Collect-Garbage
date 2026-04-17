@@ -7,7 +7,7 @@ using GarbageCollection.Business.Interfaces;
 namespace GarbageCollection.API.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/v1/[controller]")]
     public class WasteReportController : ControllerBase
     {
         private readonly IWasteReportService _wasteReportService;
@@ -27,7 +27,7 @@ namespace GarbageCollection.API.Controllers
         public async Task<IActionResult> CreateReport([FromForm] CreateWasteReportDto dto)
         {
             if (!ModelState.IsValid)
-                return BadRequest(ApiResponse<object>.Fail("Dữ liệu không hợp lệ."));
+                return BadRequest(ApiResponse<object>.Fail("Dữ liệu không hợp lệ.", "VALIDATION_ERROR"));
 
             // TODO: Lấy citizenId từ JWT claims thay vì hardcode
             var citizenId = GetCurrentCitizenId();
@@ -47,22 +47,30 @@ namespace GarbageCollection.API.Controllers
         {
             var result = await _wasteReportService.GetReportByIdAsync(id);
             if (result is null)
-                return NotFound(ApiResponse<object>.Fail($"Không tìm thấy báo cáo với ID {id}."));
+                return NotFound(ApiResponse<object>.Fail($"Không tìm thấy báo cáo với ID {id}.", "NOT_FOUND"));
 
             return Ok(ApiResponse<WasteReportResponseDto>.Ok(result));
         }
 
         /// <summary>
-        /// Lấy danh sách báo cáo của Citizen đang đăng nhập.
+        /// Lấy danh sách báo cáo của Citizen đang đăng nhập, hỗ trợ phân trang.
         /// </summary>
-        /// <param name="status">Lọc theo trạng thái: Pending, Accepted, Assigned, Collected (bỏ trống = lấy tất cả)</param>
-        [HttpGet("my-reports")]
-        [ProducesResponseType(typeof(ApiResponse<IEnumerable<WasteReportResponseDto>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetMyReports([FromQuery] ReportStatus? status = null)
+        /// <param name="page">Trang hiện tại, bắt đầu từ 1 (mặc định: 1)</param>
+        /// <param name="limit">Số bản ghi mỗi trang, tối đa 50 (mặc định: 10)</param>
+        [HttpGet("/api/v1/users/citizen-reports")]
+        [ProducesResponseType(typeof(ApiResponse<CitizenReportsResult>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status422UnprocessableEntity)]
+        public async Task<IActionResult> GetCitizenReports([FromQuery] int page = 1, [FromQuery] int limit = 10)
         {
+            if (page < 1 || limit < 1 || limit > 50)
+                return UnprocessableEntity(ApiResponse<object>.Fail(
+                    "invalid query params",
+                    "INVALID_QUERY_PARAMS",
+                    "page >= 1, limit must be between 1 and 50"));
+
             var citizenId = GetCurrentCitizenId();
-            var results = await _wasteReportService.GetReportsByCitizenAsync(citizenId, status);
-            return Ok(ApiResponse<IEnumerable<WasteReportResponseDto>>.Ok(results));
+            var result = await _wasteReportService.GetCitizenReportsPagedAsync(citizenId, page, limit);
+            return Ok(ApiResponse<CitizenReportsResult>.Ok(result, "get citizen reports successfully"));
         }
 
         /// <summary>
