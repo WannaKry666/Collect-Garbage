@@ -10,6 +10,7 @@ namespace GarbageCollection.Business.Interfaces
         Task<WasteReportResponseDto?> GetReportByIdAsync(int id);
         Task<IEnumerable<WasteReportResponseDto>> GetReportsByCitizenAsync(int citizenId, ReportStatus? status = null);
         Task<CitizenReportsResult> GetCitizenReportsPagedAsync(int citizenId, int page, int limit);
+        Task CancelReportAsync(int citizenId, int reportId);
         Task<WasteReportResponseDto> UpdateStatusAsync(int reportId, ReportStatus newStatus);
     }
 }

@@ -10,11 +10,11 @@ namespace GarbageCollection.Common.Models
 
         public List<string> ImageUrls { get; set; } = [];
 
-        public string Description { get; set; } = string.Empty;
+        public string? Description { get; set; }
 
         public List<WasteType> WasteTypes { get; set; } = [];
 
-        public WasteSize Size { get; set; }
+        public WasteSize? Size { get; set; }
 
         public ReportStatus Status { get; set; } = ReportStatus.Pending;
 
