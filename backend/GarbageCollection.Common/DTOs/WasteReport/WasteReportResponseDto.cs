@@ -2,13 +2,11 @@
 {
     public class WasteReportResponseDto
     {
-        public int Id { get; set; }
-        public int CitizenId { get; set; }
-        public string CitizenName { get; set; } = string.Empty;
+        public int ReportId { get; set; }
         public List<string> ImageUrls { get; set; } = [];
-        public string Description { get; set; } = string.Empty;
-        public List<string> WasteTypes { get; set; } = [];
-        public string Size { get; set; } = string.Empty;
+        public List<string> Type { get; set; } = [];
+        public string? Size { get; set; }
+        public string? Description { get; set; }
         public string Status { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }

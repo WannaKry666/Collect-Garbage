@@ -17,24 +17,42 @@ namespace GarbageCollection.API.Controllers
             _wasteReportService = wasteReportService;
         }
 
+        private static readonly string[] AllowedImageExtensions = [".jpg", ".jpeg", ".png"];
+        private const long MaxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
+
         /// <summary>
         /// Citizen gửi báo cáo rác mới (multipart/form-data).
         /// </summary>
-        [HttpPost]
+        [HttpPost("/api/v1/users/citizen-reports")]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResponse<WasteReportResponseDto>), StatusCodes.Status201Created)]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status422UnprocessableEntity)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status413RequestEntityTooLarge)]
         public async Task<IActionResult> CreateReport([FromForm] CreateWasteReportDto dto)
         {
             if (!ModelState.IsValid)
-                return BadRequest(ApiResponse<object>.Fail("Dữ liệu không hợp lệ.", "VALIDATION_ERROR"));
+                return UnprocessableEntity(ApiResponse<object>.Fail("invalid input data", "INVALID_INPUT"));
+
+            if (dto.Images.Count > 5)
+                return UnprocessableEntity(ApiResponse<object>.Fail("invalid input data", "INVALID_INPUT", "Tối đa 5 ảnh mỗi lần gửi."));
+
+            var invalidFormat = dto.Images.FirstOrDefault(f =>
+                !AllowedImageExtensions.Contains(Path.GetExtension(f.FileName).ToLowerInvariant()));
+            if (invalidFormat != null)
+                return UnprocessableEntity(ApiResponse<object>.Fail("invalid input data", "INVALID_FILE_FORMAT",
+                    $"Định dạng không hợp lệ: {Path.GetExtension(invalidFormat.FileName)}. Chỉ chấp nhận jpg, jpeg, png."));
+
+            var oversized = dto.Images.FirstOrDefault(f => f.Length > MaxFileSizeBytes);
+            if (oversized != null)
+                return StatusCode(StatusCodes.Status413RequestEntityTooLarge,
+                    ApiResponse<object>.Fail("file too large", "FILE_TOO_LARGE", "Mỗi ảnh tối đa 5MB."));
 
             // TODO: Lấy citizenId từ JWT claims thay vì hardcode
             var citizenId = GetCurrentCitizenId();
 
             var result = await _wasteReportService.CreateReportAsync(citizenId, dto);
-            return CreatedAtAction(nameof(GetReportById), new { id = result.Id },
-                ApiResponse<WasteReportResponseDto>.Ok(result, "Tạo báo cáo thành công."));
+            return CreatedAtAction(nameof(GetReportById), new { id = result.ReportId },
+                ApiResponse<WasteReportResponseDto>.Ok(result, "report created successfully"));
         }
 
         /// <summary>
@@ -71,6 +89,22 @@ namespace GarbageCollection.API.Controllers
             var citizenId = GetCurrentCitizenId();
             var result = await _wasteReportService.GetCitizenReportsPagedAsync(citizenId, page, limit);
             return Ok(ApiResponse<CitizenReportsResult>.Ok(result, "get citizen reports successfully"));
+        }
+
+        /// <summary>
+        /// Citizen hủy báo cáo — chỉ được khi status là Pending.
+        /// </summary>
+        /// <param name="id">ID của báo cáo</param>
+        [HttpDelete("/api/v1/users/citizen-reports/{id:int}")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> CancelReport(int id)
+        {
+            var citizenId = GetCurrentCitizenId();
+            await _wasteReportService.CancelReportAsync(citizenId, id);
+            return Ok(ApiResponse<object>.Ok(null!, "report cancelled successfully"));
         }
 
         /// <summary>

@@ -242,7 +242,6 @@ namespace GarbageCollection.DataAccess.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("Size")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Status")
