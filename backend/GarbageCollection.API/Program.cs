@@ -166,15 +166,18 @@ app.UseExceptionHandler(err => err.Run(async ctx =>
     ctx.Response.ContentType = "application/json";
     ctx.Response.StatusCode = ex switch
     {
-        KeyNotFoundException      => StatusCodes.Status404NotFound,
-        InvalidOperationException => StatusCodes.Status400BadRequest,
-        ArgumentException         => StatusCodes.Status400BadRequest,
-        _                         => StatusCodes.Status500InternalServerError
+        KeyNotFoundException         => StatusCodes.Status404NotFound,
+        UnauthorizedAccessException  => StatusCodes.Status403Forbidden,
+        InvalidOperationException    => StatusCodes.Status409Conflict,
+        ArgumentException            => StatusCodes.Status400BadRequest,
+        _                            => StatusCodes.Status500InternalServerError
     };
 
     var errorCode = ctx.Response.StatusCode switch
     {
         404 => "NOT_FOUND",
+        403 => "FORBIDDEN",
+        409 => "CONFLICT",
         400 => "BAD_REQUEST",
         _   => "INTERNAL_SERVER_ERROR"
     };
@@ -214,6 +217,7 @@ app.UseSwaggerUI(c =>
 app.UseAuthorization();
 app.MapControllers();
 
-// Khởi chạy ứng dụng — Railway inject biến PORT, cần bind đúng
-var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-app.Run($"http://0.0.0.0:{port}");
+// Health check cho Railway
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+
+app.Run();

@@ -59,6 +59,12 @@ namespace GarbageCollection.DataAccess.Repositories
             return (items, total);
         }
 
+        public async Task DeleteAsync(WasteReport report)
+        {
+            _context.WasteReports.Remove(report);
+            await _context.SaveChangesAsync();
+        }
+
         public async Task<WasteReport> UpdateAsync(WasteReport report)
         {
             report.UpdatedAt = DateTime.UtcNow;

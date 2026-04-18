@@ -10,5 +10,6 @@ namespace GarbageCollection.DataAccess.Interfaces
         Task<IEnumerable<WasteReport>> GetByCitizenIdAsync(int citizenId, ReportStatus? status = null);
         Task<(IEnumerable<WasteReport> Items, int Total)> GetByCitizenIdPagedAsync(int citizenId, int page, int limit);
         Task<WasteReport> UpdateAsync(WasteReport report);
+        Task DeleteAsync(WasteReport report);
     }
 }

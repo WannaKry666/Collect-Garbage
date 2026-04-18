@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using GarbageCollection.Common.Enums;
 using System.ComponentModel.DataAnnotations;
 
@@ -9,14 +9,12 @@ namespace GarbageCollection.Common.DTOs.WasteReport
         [Required(ErrorMessage = "Vui lòng chọn ít nhất 1 ảnh.")]
         public IList<IFormFile> Images { get; set; } = [];
 
-        [Required(ErrorMessage = "Vui lòng nhập mô tả.")]
-        [MaxLength(500, ErrorMessage = "Mô tả không vượt quá 500 ký tự.")]
-        public string Description { get; set; } = string.Empty;
-
         [Required(ErrorMessage = "Vui lòng chọn ít nhất 1 loại rác.")]
-        public IList<WasteType> WasteTypes { get; set; } = [];
+        public IList<WasteType> Type { get; set; } = [];
 
-        [Required(ErrorMessage = "Vui lòng chọn kích thước.")]
-        public WasteSize Size { get; set; }
+        public WasteSize? Size { get; set; }
+
+        [MaxLength(500, ErrorMessage = "Mô tả không vượt quá 500 ký tự.")]
+        public string? Description { get; set; }
     }
 }

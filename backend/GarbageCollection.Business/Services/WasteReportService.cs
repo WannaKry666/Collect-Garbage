@@ -22,7 +22,7 @@ namespace GarbageCollection.Business.Services
 
         public async Task<WasteReportResponseDto> CreateReportAsync(int citizenId, CreateWasteReportDto dto)
         {
-            if (dto.WasteTypes.Count > 4)
+            if (dto.Type.Count > 4)
                 throw new ArgumentException("Tối đa 4 loại rác mỗi báo cáo.");
 
             var imageUrls = await _cloudinaryService.UploadImagesAsync(dto.Images, "waste-reports");
@@ -32,7 +32,7 @@ namespace GarbageCollection.Business.Services
                 CitizenId = citizenId,
                 ImageUrls = imageUrls,
                 Description = dto.Description,
-                WasteTypes = dto.WasteTypes.ToList(),
+                WasteTypes = dto.Type.ToList(),
                 Size = dto.Size,
                 Status = ReportStatus.Pending,
                 CreatedAt = DateTime.UtcNow
@@ -70,6 +70,20 @@ namespace GarbageCollection.Business.Services
             };
         }
 
+        public async Task CancelReportAsync(int citizenId, int reportId)
+        {
+            var report = await _reportRepository.GetByIdAsync(reportId)
+                ?? throw new KeyNotFoundException("report not found");
+
+            if (report.CitizenId != citizenId)
+                throw new UnauthorizedAccessException("you are not allowed to cancel this report");
+
+            if (report.Status != ReportStatus.Pending)
+                throw new InvalidOperationException("cannot cancel report that is not pending");
+
+            await _reportRepository.DeleteAsync(report);
+        }
+
         public async Task<WasteReportResponseDto> UpdateStatusAsync(int reportId, ReportStatus newStatus)
         {
             var report = await _reportRepository.GetByIdAsync(reportId)
@@ -99,16 +113,14 @@ namespace GarbageCollection.Business.Services
 
         private static WasteReportResponseDto MapToResponse(WasteReport report) => new()
         {
-            Id = report.Id,
-            CitizenId = report.CitizenId,
-            CitizenName = report.Citizen?.FullName ?? string.Empty,
-            ImageUrls = report.ImageUrls,
+            ReportId    = report.Id,
+            ImageUrls   = report.ImageUrls,
+            Type        = report.WasteTypes.Select(w => w.ToString()).ToList(),
+            Size        = report.Size?.ToString(),
             Description = report.Description,
-            WasteTypes = report.WasteTypes.Select(w => w.ToString()).ToList(),
-            Size = report.Size.ToString(),
-            Status = report.Status.ToString(),
-            CreatedAt = report.CreatedAt,
-            UpdatedAt = report.UpdatedAt
+            Status      = report.Status.ToString(),
+            CreatedAt   = report.CreatedAt,
+            UpdatedAt   = report.UpdatedAt
         };
     }
 }
