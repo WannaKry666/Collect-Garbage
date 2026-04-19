@@ -1,6 +1,7 @@
 ﻿using GarbageCollection.Business.Helpers;
 using GarbageCollection.Business.Interfaces;
 using GarbageCollection.Common.DTOs.Auth;
+using GarbageCollection.Common.DTOs.Auth.Local;
 using GarbageCollection.Common.Models;
 using GarbageCollection.Common.Models.Internal;
 using GarbageCollection.DataAccess.Interfaces;
@@ -150,6 +151,11 @@ namespace GarbageCollection.Business.Services
             };
 
             return GoogleAuthResult.Ok(responsePayload, accessToken, refreshJwt);
+        }
+
+        public Task RegisterAsync(LocalRegisterRequestDto data)
+        {
+            throw new NotImplementedException();
         }
     }
 }

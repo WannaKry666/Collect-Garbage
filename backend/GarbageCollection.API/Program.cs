@@ -33,11 +33,16 @@ builder.Services.AddHttpContextAccessor(); // Quan trọng để truy cập Http
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IWasteReportRepository, WasteReportRepository>();
+builder.Services.AddScoped<IEmailOtpRepository, EmailOtpRepository>();
+
 
 builder.Services.AddSingleton<JwtHelper>();
 builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 builder.Services.AddScoped<IWasteReportService, WasteReportService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ILocalAuthService, LocalAuthService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 
 // ── 5. JWT Authentication ────────────────────────────────────────────────────
 builder.Services
@@ -126,6 +131,7 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+
 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
     o.MultipartBodyLengthLimit = 10 * 1024 * 1024);
 
@@ -150,13 +156,20 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-app.UseExceptionHandler(err => err.Run(async ctx =>
+app.UseExceptionHandler(err => err.Run(async context =>
 {
-    var ex = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
-    ctx.Response.StatusCode = 500;
-    ctx.Response.ContentType = "application/json";
-    await ctx.Response.WriteAsJsonAsync(new { error = ex?.Message });
+    var ex = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+
+    context.Response.StatusCode = 500;
+    context.Response.ContentType = "application/json";
+
+    await context.Response.WriteAsJsonAsync(new
+    {
+        error = ex?.Message,
+        detail = ex?.InnerException?.Message
+    });
 }));
+
 
 app.UseSwagger();
 app.UseSwaggerUI(c =>

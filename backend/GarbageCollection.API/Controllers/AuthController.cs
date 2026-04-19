@@ -1,6 +1,8 @@
 ﻿using GarbageCollection.API.Helpers;
 using GarbageCollection.Business.Interfaces;
+using GarbageCollection.Business.Services;
 using GarbageCollection.Common.DTOs.Auth;
+using GarbageCollection.Common.DTOs.Auth.Local;
 using GarbageCollection.Common.DTOs.Common;
 using Microsoft.AspNetCore.Mvc;
 using static Google.Apis.Requests.BatchRequest;
@@ -13,11 +15,13 @@ namespace GarbageCollection.API.Controllers
     {
         private readonly IAuthService _authService;
         private readonly IConfiguration _configuration;
+        private readonly ILocalAuthService _localAuthService;
 
-        public AuthController(IAuthService authService, IConfiguration configuration)
+        public AuthController(IAuthService authService, IConfiguration configuration, ILocalAuthService localAuthService)
         {
             _authService = authService;
             _configuration = configuration;
+            _localAuthService = localAuthService;
         }
 
         /// <summary>
@@ -58,6 +62,50 @@ namespace GarbageCollection.API.Controllers
             return Ok(ApiResponse<GoogleLoginResponseDto>.Success(
                 "account is valid",
                 result.Payload!));
+        }
+    
+     // ───────────────── REGISTER LOCAL ─────────────────
+        [HttpPost("local-auth/account-registration")]
+        public async Task<IActionResult> Register(
+            [FromBody] LocalRegisterRequestWrapper request)
+        {
+            var result = await _localAuthService.RegisterAsync(request.Data);
+
+            if (!result.Succeeded)
+            {
+                return StatusCode(result.HttpStatusCode,
+                    ApiResponse<object>.Fail(
+                        result.FailMessage!,
+                        result.FailCode!,
+                        result.FailDescription!));
+            }
+
+            // 🍪 set cookies
+            SetAuthCookies(result.AccessToken!, result.RefreshToken!);
+
+            return Ok(ApiResponse<LocalRegisterResponseDto>.Success(
+                "account is created",
+                result.Payload!));
+        }
+
+        // ───────────────── HELPER ─────────────────
+        private void SetAuthCookies(string accessToken, string refreshToken)
+        {
+            Response.Cookies.Append("accessToken", accessToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTime.UtcNow.AddMinutes(15) // match JwtHelper
+            });
+
+            Response.Cookies.Append("refreshToken", refreshToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTime.UtcNow.AddDays(7)
+            });
         }
     }
 }

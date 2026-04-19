@@ -14,6 +14,7 @@ namespace GarbageCollection.DataAccess.Data
         public DbSet<WasteReport> WasteReports { get; set; }
         public DbSet<User> Users => Set<User>();
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+        public DbSet<EmailOtp> EmailOtps => Set<EmailOtp>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -109,6 +110,21 @@ namespace GarbageCollection.DataAccess.Data
                  .OnDelete(DeleteBehavior.Cascade);
 
                 e.HasIndex(rt => rt.TokenHash).IsUnique();
+            });
+            // ── EmailOtp ──────────────────────────────────────────────────────
+            modelBuilder.Entity<EmailOtp>(e =>
+            {
+                e.ToTable("email_otps");
+                e.HasKey(o => o.Id);
+
+                e.Property(o => o.Id).HasColumnName("id");
+                e.Property(o => o.Email).HasColumnName("email").IsRequired().HasMaxLength(320);
+                e.Property(o => o.OtpCode).HasColumnName("otp_code").IsRequired().HasMaxLength(6);
+                e.Property(o => o.ExpiresAt).HasColumnName("expires_at");
+                e.Property(o => o.IsUsed).HasColumnName("is_used");
+                e.Property(o => o.CreatedAt).HasColumnName("created_at");
+
+                e.HasIndex(o => o.Email);
             });
         }
     }
