@@ -4,7 +4,7 @@ namespace GarbageCollection.Common.Models
 {
     public class WasteReport
     {
-        public int Id { get; set; }
+        public int ReportId { get; set; }
 
         public int CitizenId { get; set; }
 

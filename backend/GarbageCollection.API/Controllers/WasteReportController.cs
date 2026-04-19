@@ -33,8 +33,14 @@ namespace GarbageCollection.API.Controllers
             if (!ModelState.IsValid)
                 return UnprocessableEntity(ApiResponse<object>.Fail("invalid input data", "INVALID_INPUT"));
 
+            if (dto.Images.Count < 1)
+                return UnprocessableEntity(ApiResponse<object>.Fail("invalid input data", "INVALID_INPUT", "Vui lòng gửi ít nhất 1 ảnh."));
+
             if (dto.Images.Count > 5)
                 return UnprocessableEntity(ApiResponse<object>.Fail("invalid input data", "INVALID_INPUT", "Tối đa 5 ảnh mỗi lần gửi."));
+
+            if (dto.Type.Count < 1)
+                return UnprocessableEntity(ApiResponse<object>.Fail("invalid input data", "INVALID_INPUT", "Vui lòng chọn ít nhất 1 loại rác."));
 
             var invalidFormat = dto.Images.FirstOrDefault(f =>
                 !AllowedImageExtensions.Contains(Path.GetExtension(f.FileName).ToLowerInvariant()));

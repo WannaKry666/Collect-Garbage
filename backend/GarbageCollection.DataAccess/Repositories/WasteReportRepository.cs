@@ -26,7 +26,7 @@ namespace GarbageCollection.DataAccess.Repositories
         {
             return await _context.WasteReports
                 .Include(r => r.Citizen)
-                .FirstOrDefaultAsync(r => r.Id == id);
+                .FirstOrDefaultAsync(r => r.ReportId == id);
         }
 
         public async Task<IEnumerable<WasteReport>> GetByCitizenIdAsync(int citizenId, ReportStatus? status = null)

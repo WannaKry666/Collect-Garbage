@@ -60,6 +60,8 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 builder.Services.AddScoped<IWasteReportRepository, WasteReportRepository>();
 builder.Services.AddScoped<IWasteReportService, WasteReportService>();
+builder.Services.AddScoped<IComplaintRepository, ComplaintRepository>();
+builder.Services.AddScoped<IComplaintService, ComplaintService>();
 
 // ── 6. Cấu hình API & Controller ───────────────────────────────────────────────
 builder.Services.AddControllers()
