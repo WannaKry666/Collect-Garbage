@@ -8,6 +8,10 @@
 
         public string Email { get; set; } = string.Empty;
 
+        public string? Address { get; set; }
+
+        public string? AvatarUrl { get; set; }
+
         public int TotalPoints { get; set; } = 0;
 
         // Navigation
