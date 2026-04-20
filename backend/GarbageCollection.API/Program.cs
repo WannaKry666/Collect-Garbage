@@ -1,5 +1,4 @@
 ﻿using CloudinaryDotNet;
-using DotNetEnv;
 using GarbageCollection.Business.Helpers;
 using GarbageCollection.Business.Interfaces;
 using GarbageCollection.Business.Services;
@@ -8,13 +7,10 @@ using GarbageCollection.DataAccess.Data;
 using GarbageCollection.DataAccess.Interfaces;
 using GarbageCollection.DataAccess.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
-using System.Text;
-using System.Text.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -22,147 +18,16 @@ using DotNetEnv;
 
 // ── 1. Nạp biến môi trường từ file .env ─────────────────────────────────────────
 Env.Load();
+using System.Text;
+using System.Text.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.HttpOverrides;
+using DotNetEnv;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
-<<<<<<< HEAD
-// ─────────────────────────────────────────────
-// 1. ENV CONFIG
-// ─────────────────────────────────────────────
-Env.Load();
-builder.Configuration.AddEnvironmentVariables();
-
-// ─────────────────────────────────────────────
-// 2. DB CONFIG
-// ─────────────────────────────────────────────
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(connectionString));
-
-// ─────────────────────────────────────────────
-// 3. SETTINGS
-// ─────────────────────────────────────────────
-builder.Services.Configure<CloudinarySettings>(
-    builder.Configuration.GetSection("Cloudinary"));
-
-var jwtSection = builder.Configuration.GetSection("Jwt");
-var secretKey = jwtSection["SecretKey"] 
-    ?? throw new Exception("Jwt:SecretKey missing");
-
-<<<<<<< HEAD
-// ─────────────────────────────────────────────
-// 4. CORE SERVICES
-// ─────────────────────────────────────────────
-builder.Services.AddHttpContextAccessor();
-
-// Repositories
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
-builder.Services.AddScoped<IWasteReportRepository, WasteReportRepository>();
-builder.Services.AddScoped<IEmailOtpRepository, EmailOtpRepository>();
-
-// Services
-builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
-builder.Services.AddScoped<IWasteReportService, WasteReportService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<ILocalAuthService, LocalAuthService>();
-builder.Services.AddScoped<ILocalLoginService, LocalLoginService>();
-builder.Services.AddScoped<IEmailService, SmtpEmailService>();
-builder.Services.AddScoped<IVerifyEmailService, VerifyEmailService>();
-
-builder.Services.AddSingleton<JwtHelper>();
-
-// ─────────────────────────────────────────────
-// 5. AUTH - JWT
-// ─────────────────────────────────────────────
-builder.Services
-    .AddAuthentication(options =>
-    {
-        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-    })
-    .AddJwtBearer(options =>
-    {
-        options.RequireHttpsMetadata = false;
-        options.SaveToken = true;
-
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidIssuer = jwtSection["Issuer"],
-
-            ValidateAudience = true,
-            ValidAudience = jwtSection["Audience"],
-
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(secretKey)),
-
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
-        };
-
-        options.Events = new JwtBearerEvents
-        {
-            OnMessageReceived = context =>
-            {
-                if (context.Request.Cookies.TryGetValue("accessToken", out var token))
-                {
-                    context.Token = token;
-                }
-                return Task.CompletedTask;
-            }
-        };
-    });
-
-builder.Services.AddAuthorization();
-
-// ─────────────────────────────────────────────
-// 6. CORS
-// ─────────────────────────────────────────────
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.WithOrigins(
-                "https://ecoconnect-citizen.lovable.app",
-                "https://eco-connect-admin-re.lovable.app",
-                "https://eco-connect-collector.lovable.app",
-                "https://eco-conect-landing-page.lovable.app",
-                "https://collect-garbage-production.up.railway.app",
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "http://localhost:4200"
-            )
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
-    });
-});
-
-// ─────────────────────────────────────────────
-// 7. CONTROLLERS
-// ─────────────────────────────────────────────
-builder.Services.AddControllers()
-    .AddJsonOptions(o =>
-    {
-        o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-        o.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
-    });
-
-// Upload limit
-builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
-{
-    o.MultipartBodyLengthLimit = 10 * 1024 * 1024;
-});
-
-// ─────────────────────────────────────────────
-// 8. SWAGGER
-// ─────────────────────────────────────────────
-// ── API ───────────────────────────────────────────────────────────────────────
-builder.Services.AddControllers()
-    .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 // Bắt buộc .NET đọc thêm cấu hình từ Environment Variables để đè lên appsettings.json
 builder.Configuration.AddEnvironmentVariables();
 
@@ -205,6 +70,8 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 builder.Services.AddScoped<IWasteReportRepository, WasteReportRepository>();
 builder.Services.AddScoped<IWasteReportService, WasteReportService>();
+builder.Services.AddScoped<IComplaintRepository, ComplaintRepository>();
+builder.Services.AddScoped<IComplaintService, ComplaintService>();
 
 // ── 6. Cấu hình API & Controller ───────────────────────────────────────────────
 builder.Services.AddControllers()
@@ -234,13 +101,11 @@ builder.Services.AddSwaggerGen(c =>
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath))
-        c.IncludeXmlComments(xmlPath);
-
     {
         c.IncludeXmlComments(xmlPath);
     }
 
-    // Cấu hình JWT Bearer Token cho Swagger
+    // JWT Bearer – dùng khi đã tích hợp authentication
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -267,15 +132,12 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// ─────────────────────────────────────────────
-// 9. BUILD APP
-// ─────────────────────────────────────────────
-var app = builder.Build();
+// Giới hạn kích thước file upload (tối đa 10 MB)
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
+{
+    o.MultipartBodyLengthLimit = 10 * 1024 * 1024;
+});
 
-// ─────────────────────────────────────────────
-// 10. SEED DATA
-// ─────────────────────────────────────────────
-using (var scope = app.Services.CreateScope())
 var app = builder.Build();
 
 // ── 8. Seed dữ liệu test ───────────────────────────────────────────────────────
@@ -316,7 +178,6 @@ var exceptionJsonOptions = new JsonSerializerOptions
 app.UseExceptionHandler(err => err.Run(async ctx =>
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
     if (!db.Citizens.Any())
     {
         db.Citizens.Add(new GarbageCollection.Common.Models.Citizen
@@ -325,15 +186,12 @@ app.UseExceptionHandler(err => err.Run(async ctx =>
             Email = "test@GarbageCollection.com",
             TotalPoints = 0
         });
-
         db.SaveChanges();
     }
 }
 
-// ─────────────────────────────────────────────
-// 11. EXCEPTION HANDLER
-// ─────────────────────────────────────────────
-app.UseExceptionHandler(err => err.Run(async context =>
+// ── Global Exception Handler ──────────────────────────────────────────────────
+app.UseExceptionHandler(err => err.Run(async ctx =>
 {
     var ex = context.Features
         .Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;

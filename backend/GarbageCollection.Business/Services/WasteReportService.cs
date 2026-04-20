@@ -113,7 +113,7 @@ namespace GarbageCollection.Business.Services
 
         private static WasteReportResponseDto MapToResponse(WasteReport report) => new()
         {
-            ReportId    = report.Id,
+            ReportId    = report.ReportId,
             ImageUrls   = report.ImageUrls,
             Type        = report.WasteTypes.Select(w => w.ToString()).ToList(),
             Size        = report.Size?.ToString(),

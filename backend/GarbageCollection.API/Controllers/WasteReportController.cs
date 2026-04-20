@@ -31,21 +31,7 @@ namespace GarbageCollection.API.Controllers
         public async Task<IActionResult> CreateReport([FromForm] CreateWasteReportDto dto)
         {
             if (!ModelState.IsValid)
-                return UnprocessableEntity(ApiResponse<object>.Fail("invalid input data", "INVALID_INPUT"));
-
-            if (dto.Images.Count > 5)
-                return UnprocessableEntity(ApiResponse<object>.Fail("invalid input data", "INVALID_INPUT", "Tối đa 5 ảnh mỗi lần gửi."));
-
-            var invalidFormat = dto.Images.FirstOrDefault(f =>
-                !AllowedImageExtensions.Contains(Path.GetExtension(f.FileName).ToLowerInvariant()));
-            if (invalidFormat != null)
-                return UnprocessableEntity(ApiResponse<object>.Fail("invalid input data", "INVALID_FILE_FORMAT",
-                    $"Định dạng không hợp lệ: {Path.GetExtension(invalidFormat.FileName)}. Chỉ chấp nhận jpg, jpeg, png."));
-
-            var oversized = dto.Images.FirstOrDefault(f => f.Length > MaxFileSizeBytes);
-            if (oversized != null)
-                return StatusCode(StatusCodes.Status413RequestEntityTooLarge,
-                    ApiResponse<object>.Fail("file too large", "FILE_TOO_LARGE", "Mỗi ảnh tối đa 5MB."));
+                return BadRequest(ModelState);
 
             // TODO: Lấy citizenId từ JWT claims thay vì hardcode
             var citizenId = GetCurrentCitizenId();
