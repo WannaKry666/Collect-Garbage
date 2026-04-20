@@ -1,11 +1,11 @@
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASSWORD};SSL Mode=Require;Trust Server Certificate=true"
+    "DefaultConnection": ""
   },
   "Cloudinary": {
-    "CloudName": "${CLOUDINARY_CLOUD_NAME}",
-    "ApiKey": "${CLOUDINARY_API_KEY}",
-    "ApiSecret": "${CLOUDINARY_API_SECRET}"
+    "CloudName": "",
+    "ApiKey": "",
+    "ApiSecret": ""
   },
   "Jwt": {
     "SecretKey": "",

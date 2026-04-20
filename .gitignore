@@ -20,6 +20,8 @@ packages/
 ## dotnet tool
 .dotnet/
 
+.env
+
 ## Logs
 *.log
 logs/

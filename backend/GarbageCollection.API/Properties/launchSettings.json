@@ -1,11 +1,12 @@
 {
   "profiles": {
-    "http": {
+    "GarbageCollection.API": {
       "commandName": "Project",
-      "applicationUrl": "http://localhost:5000",
+      "launchBrowser": true,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
-      }
+      },
+      "applicationUrl": "https://localhost:54194;http://localhost:54195"
     }
   }
 }

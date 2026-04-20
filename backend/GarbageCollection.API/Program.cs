@@ -1,12 +1,15 @@
 ﻿using CloudinaryDotNet;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi.Models;
+using GarbageCollection.Business.Helpers;
+using GarbageCollection.Business.Interfaces;
+using GarbageCollection.Business.Services;
 using GarbageCollection.Common.Settings;
 using GarbageCollection.DataAccess.Data;
 using GarbageCollection.DataAccess.Interfaces;
 using GarbageCollection.DataAccess.Repositories;
-using GarbageCollection.Business.Interfaces;
-using GarbageCollection.Business.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -15,6 +18,8 @@ using DotNetEnv;
 
 // ── 1. Nạp biến môi trường từ file .env ─────────────────────────────────────────
 Env.Load();
+using System.Text;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -79,16 +84,15 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
 
 // ── 7. Swagger / OpenAPI Configuration ─────────────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
+
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "GarbageCollection Waste Collection API",
-        Version = "v1",
-        Description = "API quản lý báo cáo rác thải - GarbageCollection"
+        Title = "GarbageCollection API",
+        Version = "v1"
     });
 
-    // Bật XML comments từ file .xml được sinh ra khi build
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath))
@@ -103,8 +107,7 @@ builder.Services.AddSwaggerGen(c =>
         Type = SecuritySchemeType.Http,
         Scheme = "Bearer",
         BearerFormat = "JWT",
-        In = ParameterLocation.Header,
-        Description = "Nhập token theo định dạng: Bearer {token}"
+        In = ParameterLocation.Header
     });
 
     c.UseInlineDefinitionsForEnums();
@@ -163,6 +166,47 @@ var exceptionJsonOptions = new JsonSerializerOptions
 
 app.UseExceptionHandler(err => err.Run(async ctx =>
 {
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    if (!db.Citizens.Any())
+    {
+        var db = services.GetRequiredService<AppDbContext>();
+
+        // Kiểm tra nếu chưa có dữ liệu Citizen thì thêm mới
+        if (!db.Citizens.Any())
+        {
+            db.Citizens.Add(new GarbageCollection.Common.Models.Citizen
+            {
+                FullName = "Test Citizen",
+                Email = "test@GarbageCollection.com",
+                TotalPoints = 0
+            });
+            db.SaveChanges();
+        }
+    }
+    catch (Exception ex)
+    {
+        // Ghi log nếu lỗi kết nối hoặc seed data
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Đã xảy ra lỗi khi seed dữ liệu vào Database.");
+    }
+}
+
+// ── 9. Global Exception Handler ────────────────────────────────────────────────
+var exceptionJsonOptions = new JsonSerializerOptions
+{
+    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+    Converters = { new JsonStringEnumConverter() }
+};
+
+app.UseExceptionHandler(err => err.Run(async ctx =>
+{
+    var ex = context.Features
+        .Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+
+    context.Response.StatusCode = 500;
+    context.Response.ContentType = "application/json";
+
+    await context.Response.WriteAsJsonAsync(new
     var ex = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
 
     ctx.Response.ContentType = "application/json";
@@ -212,11 +256,17 @@ app.UseCors("AllowFrontend");
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "GarbageCollection Waste API v1");
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "GarbageCollection API v1");
     c.RoutePrefix = "swagger";
 });
 
+app.UseHttpsRedirection();
+
+app.UseCors("AllowFrontend");
+
+app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 
 // Health check cho Railway
