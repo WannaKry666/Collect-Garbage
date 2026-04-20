@@ -19,11 +19,6 @@ using DotNetEnv;
 // ── 1. Nạp biến môi trường từ file .env ─────────────────────────────────────────
 Env.Load();
 using System.Text;
-using System.Text.Json;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.HttpOverrides;
-using DotNetEnv;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -105,7 +100,7 @@ builder.Services.AddSwaggerGen(c =>
         c.IncludeXmlComments(xmlPath);
     }
 
-    // JWT Bearer – dùng khi đã tích hợp authentication
+    // Cấu hình JWT Bearer Token cho Swagger
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -130,12 +125,6 @@ builder.Services.AddSwaggerGen(c =>
             Array.Empty<string>()
         }
     });
-});
-
-// Giới hạn kích thước file upload (tối đa 10 MB)
-builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(o =>
-{
-    o.MultipartBodyLengthLimit = 10 * 1024 * 1024;
 });
 
 var app = builder.Build();
@@ -180,17 +169,35 @@ app.UseExceptionHandler(err => err.Run(async ctx =>
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     if (!db.Citizens.Any())
     {
-        db.Citizens.Add(new GarbageCollection.Common.Models.Citizen
+        var db = services.GetRequiredService<AppDbContext>();
+
+        // Kiểm tra nếu chưa có dữ liệu Citizen thì thêm mới
+        if (!db.Citizens.Any())
         {
-            FullName = "Test Citizen",
-            Email = "test@GarbageCollection.com",
-            TotalPoints = 0
-        });
-        db.SaveChanges();
+            db.Citizens.Add(new GarbageCollection.Common.Models.Citizen
+            {
+                FullName = "Test Citizen",
+                Email = "test@GarbageCollection.com",
+                TotalPoints = 0
+            });
+            db.SaveChanges();
+        }
+    }
+    catch (Exception ex)
+    {
+        // Ghi log nếu lỗi kết nối hoặc seed data
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Đã xảy ra lỗi khi seed dữ liệu vào Database.");
     }
 }
 
-// ── Global Exception Handler ──────────────────────────────────────────────────
+// ── 9. Global Exception Handler ────────────────────────────────────────────────
+var exceptionJsonOptions = new JsonSerializerOptions
+{
+    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+    Converters = { new JsonStringEnumConverter() }
+};
+
 app.UseExceptionHandler(err => err.Run(async ctx =>
 {
     var ex = context.Features
