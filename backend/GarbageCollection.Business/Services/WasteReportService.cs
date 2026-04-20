@@ -1,9 +1,10 @@
-﻿using GarbageCollection.Common.DTOs;
+﻿using GarbageCollection.Business.Interfaces;
+using GarbageCollection.Common.DTOs;
 using GarbageCollection.Common.DTOs.WasteReport;
 using GarbageCollection.Common.Enums;
+using GarbageCollection.Common.Exceptions;
 using GarbageCollection.Common.Models;
 using GarbageCollection.DataAccess.Interfaces;
-using GarbageCollection.Business.Interfaces;
 
 namespace GarbageCollection.Business.Services
 {
@@ -82,6 +83,41 @@ namespace GarbageCollection.Business.Services
                 throw new InvalidOperationException("cannot cancel report that is not pending");
 
             await _reportRepository.DeleteAsync(report);
+        }
+
+        public async Task<WasteReportResponseDto> UpdateReportAsync(int citizenId, int reportId, UpdateWasteReportDto dto)
+        {
+            var report = await _reportRepository.GetByIdAsync(reportId)
+                ?? throw new KeyNotFoundException("report not found");
+
+            if (report.CitizenId != citizenId)
+                throw new UnauthorizedAccessException("you are not allowed to update this report");
+
+            if (report.Status != ReportStatus.Pending)
+                throw new InvalidOperationException("cannot update report that is not pending");
+
+            // Chỉ cho phép update 1 lần (updated_at phải còn null)
+            if (report.UpdatedAt.HasValue)
+                throw new TooManyRequestsException("too many request");
+
+            // Upload ảnh mới và xóa ảnh cũ nếu có gửi ảnh
+            if (dto.Images != null && dto.Images.Count > 0)
+            {
+                await _cloudinaryService.DeleteImagesAsync(report.ImageUrls);
+                report.ImageUrls = await _cloudinaryService.UploadImagesAsync(dto.Images, "waste-reports");
+            }
+
+            if (dto.Type != null && dto.Type.Count > 0)
+                report.WasteTypes = dto.Type.ToList();
+
+            if (dto.Size.HasValue)
+                report.Size = dto.Size;
+
+            if (dto.Description != null)
+                report.Description = dto.Description;
+
+            var updated = await _reportRepository.UpdateAsync(report);
+            return MapToResponse(updated);
         }
 
         public async Task<WasteReportResponseDto> UpdateStatusAsync(int reportId, ReportStatus newStatus)

@@ -14,6 +14,10 @@
 
         public int TotalPoints { get; set; } = 0;
 
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public DateTime? UpdatedAt { get; set; }
+
         // Navigation
         public ICollection<WasteReport> WasteReports { get; set; } = new List<WasteReport>();
     }

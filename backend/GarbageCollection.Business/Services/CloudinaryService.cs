@@ -74,5 +74,41 @@ namespace GarbageCollection.Business.Services
             var deleteParams = new DeletionParams(publicId);
             await _cloudinary.DestroyAsync(deleteParams);
         }
+
+        public async Task DeleteImagesAsync(IList<string> imageUrls)
+        {
+            if (imageUrls == null || imageUrls.Count == 0) return;
+
+            var deleteTasks = imageUrls.Select(url =>
+            {
+                var publicId = ExtractPublicId(url);
+                return DeleteImageAsync(publicId);
+            });
+
+            await Task.WhenAll(deleteTasks);
+        }
+
+        // Trích publicId từ URL Cloudinary
+        // VD: https://res.cloudinary.com/demo/image/upload/v1234/waste-reports/abc.jpg
+        //   → waste-reports/abc
+        private static string ExtractPublicId(string url)
+        {
+            var uploadIndex = url.IndexOf("/upload/", StringComparison.OrdinalIgnoreCase);
+            if (uploadIndex < 0) return url;
+
+            var afterUpload = url[(uploadIndex + 8)..]; // bỏ "/upload/"
+
+            // Bỏ version segment nếu có (vNNNN/)
+            if (afterUpload.StartsWith('v') && afterUpload.Contains('/'))
+            {
+                var slash = afterUpload.IndexOf('/');
+                if (afterUpload[1..slash].All(char.IsDigit))
+                    afterUpload = afterUpload[(slash + 1)..];
+            }
+
+            // Bỏ extension
+            var dotIndex = afterUpload.LastIndexOf('.');
+            return dotIndex >= 0 ? afterUpload[..dotIndex] : afterUpload;
+        }
     }
 }

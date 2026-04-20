@@ -1,8 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using GarbageCollection.Business.Helpers;
 using GarbageCollection.Common.DTOs;
 using GarbageCollection.Common.DTOs.WasteReport;
 using GarbageCollection.Common.Enums;
 using GarbageCollection.Business.Interfaces;
+using GarbageCollection.DataAccess.Interfaces;
 
 namespace GarbageCollection.API.Controllers
 {
@@ -11,10 +14,12 @@ namespace GarbageCollection.API.Controllers
     public class WasteReportController : ControllerBase
     {
         private readonly IWasteReportService _wasteReportService;
+        private readonly ICitizenRepository _citizenRepository;
 
-        public WasteReportController(IWasteReportService wasteReportService)
+        public WasteReportController(IWasteReportService wasteReportService, ICitizenRepository citizenRepository)
         {
-            _wasteReportService = wasteReportService;
+            _wasteReportService  = wasteReportService;
+            _citizenRepository   = citizenRepository;
         }
 
         private static readonly string[] AllowedImageExtensions = [".jpg", ".jpeg", ".png"];
@@ -23,6 +28,7 @@ namespace GarbageCollection.API.Controllers
         /// <summary>
         /// Citizen gửi báo cáo rác mới (multipart/form-data).
         /// </summary>
+        [Authorize]
         [HttpPost("/api/v1/users/citizen-reports")]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(ApiResponse<WasteReportResponseDto>), StatusCodes.Status201Created)]
@@ -53,8 +59,8 @@ namespace GarbageCollection.API.Controllers
                 return StatusCode(StatusCodes.Status413RequestEntityTooLarge,
                     ApiResponse<object>.Fail("file too large", "FILE_TOO_LARGE", "Mỗi ảnh tối đa 5MB."));
 
-            // TODO: Lấy citizenId từ JWT claims thay vì hardcode
-            var citizenId = GetCurrentCitizenId();
+            var (citizenId, authErr) = await GetAuthorizedCitizenAsync();
+            if (authErr is not null) return authErr;
 
             var result = await _wasteReportService.CreateReportAsync(citizenId, dto);
             return CreatedAtAction(nameof(GetReportById), new { id = result.ReportId },
@@ -81,6 +87,7 @@ namespace GarbageCollection.API.Controllers
         /// </summary>
         /// <param name="page">Trang hiện tại, bắt đầu từ 1 (mặc định: 1)</param>
         /// <param name="limit">Số bản ghi mỗi trang, tối đa 50 (mặc định: 10)</param>
+        [Authorize]
         [HttpGet("/api/v1/users/citizen-reports")]
         [ProducesResponseType(typeof(ApiResponse<CitizenReportsResult>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status422UnprocessableEntity)]
@@ -92,15 +99,61 @@ namespace GarbageCollection.API.Controllers
                     "INVALID_QUERY_PARAMS",
                     "page >= 1, limit must be between 1 and 50"));
 
-            var citizenId = GetCurrentCitizenId();
+            var (citizenId, authErr) = await GetAuthorizedCitizenAsync();
+            if (authErr is not null) return authErr;
+
             var result = await _wasteReportService.GetCitizenReportsPagedAsync(citizenId, page, limit);
             return Ok(ApiResponse<CitizenReportsResult>.Ok(result, "get citizen reports successfully"));
+        }
+
+        /// <summary>
+        /// Citizen cập nhật báo cáo — chỉ được khi status là Pending và chưa từng update.
+        /// </summary>
+        /// <param name="id">ID của báo cáo</param>
+        /// <param name="dto">Các trường cần cập nhật (tất cả optional)</param>
+        [Authorize]
+        [HttpPut("/api/v1/users/citizen-reports/{id:int}")]
+        [Consumes("multipart/form-data")]
+        [ProducesResponseType(typeof(ApiResponse<WasteReportResponseDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status422UnprocessableEntity)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status429TooManyRequests)]
+        public async Task<IActionResult> UpdateReport(int id, [FromForm] UpdateWasteReportDto dto)
+        {
+            if (!ModelState.IsValid)
+                return UnprocessableEntity(ApiResponse<object>.Fail("invalid input data", "INVALID_INPUT"));
+
+            if (dto.Images != null && dto.Images.Count > 0)
+            {
+                if (dto.Images.Count > 5)
+                    return UnprocessableEntity(ApiResponse<object>.Fail("invalid input data", "INVALID_INPUT", "Tối đa 5 ảnh mỗi lần gửi."));
+
+                var invalidFormat = dto.Images.FirstOrDefault(f =>
+                    !AllowedImageExtensions.Contains(Path.GetExtension(f.FileName).ToLowerInvariant()));
+                if (invalidFormat != null)
+                    return UnprocessableEntity(ApiResponse<object>.Fail("invalid input data", "INVALID_FILE_FORMAT",
+                        $"Định dạng không hợp lệ: {Path.GetExtension(invalidFormat.FileName)}. Chỉ chấp nhận jpg, jpeg, png."));
+
+                var oversized = dto.Images.FirstOrDefault(f => f.Length > MaxFileSizeBytes);
+                if (oversized != null)
+                    return StatusCode(StatusCodes.Status413RequestEntityTooLarge,
+                        ApiResponse<object>.Fail("file too large", "FILE_TOO_LARGE", "Mỗi ảnh tối đa 5MB."));
+            }
+
+            var (citizenId, authErr) = await GetAuthorizedCitizenAsync();
+            if (authErr is not null) return authErr;
+
+            var result = await _wasteReportService.UpdateReportAsync(citizenId, id, dto);
+            return Ok(ApiResponse<WasteReportResponseDto>.Ok(result, "report updated successfully"));
         }
 
         /// <summary>
         /// Citizen hủy báo cáo — chỉ được khi status là Pending.
         /// </summary>
         /// <param name="id">ID của báo cáo</param>
+        [Authorize]
         [HttpDelete("/api/v1/users/citizen-reports/{id:int}")]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -108,7 +161,9 @@ namespace GarbageCollection.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
         public async Task<IActionResult> CancelReport(int id)
         {
-            var citizenId = GetCurrentCitizenId();
+            var (citizenId, authErr) = await GetAuthorizedCitizenAsync();
+            if (authErr is not null) return authErr;
+
             await _wasteReportService.CancelReportAsync(citizenId, id);
             return Ok(ApiResponse<object>.Ok(null!, "report cancelled successfully"));
         }
@@ -129,7 +184,17 @@ namespace GarbageCollection.API.Controllers
             return Ok(ApiResponse<WasteReportResponseDto>.Ok(result, "Cập nhật trạng thái thành công."));
         }
 
-        // Tạm thời hardcode, sẽ thay bằng JWT claim sau
-        private static int GetCurrentCitizenId() => 1;
+        private async Task<(int Id, IActionResult? Error)> GetAuthorizedCitizenAsync()
+        {
+            var email = User.GetEmail();
+            if (email is null)
+                return (0, Unauthorized(ApiResponse<object>.Fail("unauthorized", "UNAUTHORIZED")));
+
+            var citizen = await _citizenRepository.GetByEmailAsync(email);
+            if (citizen is null)
+                return (0, NotFound(ApiResponse<object>.Fail("account not found", "NOT_FOUND")));
+
+            return (citizen.Id, null);
+        }
     }
 }

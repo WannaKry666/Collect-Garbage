@@ -5,7 +5,6 @@ using GarbageCollection.Business.Services;
 using GarbageCollection.Common.DTOs;
 using GarbageCollection.Common.DTOs.Auth;
 using GarbageCollection.Common.DTOs.Auth.Local;
-using GarbageCollection.Common.DTOs.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using static Google.Apis.Requests.BatchRequest;
