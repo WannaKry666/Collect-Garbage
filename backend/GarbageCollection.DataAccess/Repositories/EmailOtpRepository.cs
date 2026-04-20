@@ -32,7 +32,12 @@ namespace GarbageCollection.DataAccess.Repositories
                            && o.ExpiresAt > DateTime.UtcNow)
                   .OrderByDescending(o => o.CreatedAt)
                   .FirstOrDefaultAsync(ct);
-
+        public Task<EmailOtp?> GetLatestByEmailAsync(string email, CancellationToken ct = default)
+           => _db.EmailOtps
+                 .AsNoTracking()
+                 .Where(o => o.Email == email)
+                 .OrderByDescending(o => o.CreatedAt)
+                 .FirstOrDefaultAsync(ct);
         public async Task MarkUsedAsync(Guid otpId, CancellationToken ct = default)
         {
             await _db.EmailOtps

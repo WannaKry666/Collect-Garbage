@@ -23,6 +23,16 @@ namespace GarbageCollection.DataAccess.Repositories
             => _db.Users
                   .AsNoTracking()
                   .FirstOrDefaultAsync(u => u.Email == email, ct);
+        public Task<User?> GetByEmailTrackedAsync(string email, CancellationToken ct = default)
+         => _db.Users
+               .FirstOrDefaultAsync(u => u.Email == email, ct);
+
+        public Task<EmailOtp?> GetLatestByEmailAsync(string email, CancellationToken ct = default)
+            => _db.EmailOtps
+                  .AsNoTracking()
+                  .Where(o => o.Email == email)
+                  .OrderByDescending(o => o.CreatedAt)
+                  .FirstOrDefaultAsync(ct);
 
         public Task<User?> GetByGoogleIdAsync(string googleId, CancellationToken ct = default)
             => _db.Users

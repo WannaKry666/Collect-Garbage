@@ -36,6 +36,7 @@ builder.Services.AddScoped<IWasteReportRepository, WasteReportRepository>();
 builder.Services.AddScoped<IEmailOtpRepository, EmailOtpRepository>();
 
 
+
 builder.Services.AddSingleton<JwtHelper>();
 builder.Services.AddScoped<ICloudinaryService, CloudinaryService>();
 builder.Services.AddScoped<IWasteReportService, WasteReportService>();
@@ -43,6 +44,8 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ILocalAuthService, LocalAuthService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+builder.Services.AddScoped<IVerifyEmailService, VerifyEmailService>();
+builder.Services.AddScoped<ILocalLoginService, LocalLoginService>();
 
 // ── 5. JWT Authentication ────────────────────────────────────────────────────
 builder.Services

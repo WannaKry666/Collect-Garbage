@@ -1,9 +1,12 @@
 ﻿using GarbageCollection.API.Helpers;
+using GarbageCollection.Business.Helpers;
 using GarbageCollection.Business.Interfaces;
 using GarbageCollection.Business.Services;
+using GarbageCollection.Common.DTOs;
 using GarbageCollection.Common.DTOs.Auth;
 using GarbageCollection.Common.DTOs.Auth.Local;
 using GarbageCollection.Common.DTOs.Common;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using static Google.Apis.Requests.BatchRequest;
 
@@ -15,12 +18,16 @@ namespace GarbageCollection.API.Controllers
     {
         private readonly IAuthService _authService;
         private readonly IConfiguration _configuration;
+        private readonly IVerifyEmailService _verifyEmailService;
         private readonly ILocalAuthService _localAuthService;
+        private readonly ILocalLoginService _localLoginService;
 
-        public AuthController(IAuthService authService, IConfiguration configuration, ILocalAuthService localAuthService)
+        public AuthController(IAuthService authService, IConfiguration configuration, IVerifyEmailService verifyEmailService, ILocalLoginService localLoginService, ILocalAuthService localAuthService)
         {
             _authService = authService;
             _configuration = configuration;
+            _verifyEmailService = verifyEmailService;
+            _localLoginService = localLoginService;
             _localAuthService = localAuthService;
         }
 
@@ -63,8 +70,8 @@ namespace GarbageCollection.API.Controllers
                 "account is valid",
                 result.Payload!));
         }
-    
-     // ───────────────── REGISTER LOCAL ─────────────────
+
+        // ───────────────── REGISTER LOCAL ─────────────────
         [HttpPost("local-auth/account-registration")]
         public async Task<IActionResult> Register(
             [FromBody] LocalRegisterRequestWrapper request)
@@ -107,5 +114,117 @@ namespace GarbageCollection.API.Controllers
                 Expires = DateTime.UtcNow.AddDays(7)
             });
         }
+        // ── POST /api/v1/auth/local-auth/login ───────────────────────────────
+
+        /// <summary>
+        /// Authenticates a local (email + password) user and issues auth cookies.
+        /// </summary>
+        /// <remarks>
+        /// **Business rules enforced by the service**
+        /// - Email must be valid format; password must meet complexity rules → 422
+        /// - User must exist and password must match → 409 INVALID_CREDENTIALS
+        ///   (same error for both cases — prevents user-enumeration)
+        /// - Email must be verified before login is allowed → 409 EMAIL_NOT_VERIFIED
+        ///
+        /// **On success**
+        /// - Two HttpOnly, SameSite=Strict cookies are set: `accessToken`, `refreshToken`
+        /// - Response body contains the user profile (no password, no tokens)
+        ///
+        /// **Error codes**
+        /// - `VALIDATION_ERROR` (422) — email or password format invalid
+        /// - `INVALID_CREDENTIALS` (409) — email not found or password mismatch
+        /// - `EMAIL_NOT_VERIFIED` (409) — account exists but email not confirmed yet
+        /// </remarks>
+        [HttpPost("local-auth/login")]
+        [ProducesResponseType(typeof(ApiResponse<LocalLoginResponseDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status422UnprocessableEntity)]
+        public async Task<IActionResult> LocalLogin(
+            [FromBody] LocalLoginRequestWrapper request,
+            CancellationToken ct)
+        {
+            // ── Shape guard ───────────────────────────────────────────────────
+            if (request?.Data is null)
+            {
+                return UnprocessableEntity(ApiResponse<object>.Fail(
+                    "data is unvalid",
+                    "VALIDATION_ERROR",
+                    "Request body must contain a 'data' object with email and password."));
+            }
+
+            // ── Delegate ALL business logic to the service ────────────────────
+            var result = await _localLoginService.LoginAsync(request.Data, ct);
+
+            if (!result.Succeeded)
+            {
+                return StatusCode(
+                    result.HttpStatusCode,
+                    ApiResponse<object>.Fail(
+                        result.FailMessage!,
+                        result.FailCode!,
+                        result.FailDescription!));
+            }
+
+            // ── Set HttpOnly cookies (HTTP / controller concern) ───────────────
+            CookieHelper.SetAuthCookies(
+                Response, result.AccessToken!, result.RefreshToken!, _configuration);
+
+            return Ok(ApiResponse<LocalLoginResponseDto>.Success(
+                "account is valid",
+                result.Payload!));
+        }
+        //[Authorize]
+        [HttpPost("local-auth/account-verification")]
+        [ProducesResponseType(typeof(ApiResponse<VerifyEmailResponseDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status422UnprocessableEntity)]
+        public async Task<IActionResult> VerifyEmail(
+           [FromBody] VerifyEmailRequestWrapper request,
+           CancellationToken ct)
+        {
+            // ── Shape guard (malformed / missing body) ────────────────────────
+            if (request?.Data is null)
+            {
+                return UnprocessableEntity(ApiResponse<object>.Fail(
+                    "data is unvalid",
+                    "INVALID_DATA",
+                    "Request body must contain a 'data' object with email and otp."));
+            }
+
+            // ── Extract email from JWT claims (HTTP / security concern) ────────
+            // [Authorize] guarantees User is authenticated at this point.
+            // If the claim is somehow absent the token is malformed — treat as 401.
+            var tokenEmail = User.GetEmail();
+            if (tokenEmail is null)
+            {
+                return Unauthorized(ApiResponse<object>.Fail(
+                    "Unauthorized",
+                    "UNAUTHORIZED",
+                    "Access token does not contain a valid email claim."));
+            }
+
+            // ── Delegate ALL business logic to the service ────────────────────
+            var result = await _verifyEmailService.VerifyEmailAsync(request.Data, tokenEmail, ct);
+
+            if (!result.Succeeded)
+            {
+                return StatusCode(
+                    result.HttpStatusCode,
+                    ApiResponse<object>.Fail(
+                        result.FailMessage!,
+                        result.FailCode!,
+                        result.FailDescription!));
+            }
+
+            return Ok(ApiResponse<VerifyEmailResponseDto>.Success(
+                "account has been verified",
+                result.Payload!));
+        }
+
+
     }
 }
+

@@ -15,6 +15,8 @@ namespace GarbageCollection.DataAccess.Interfaces
         /// <summary>Returns the latest unused, non-expired OTP for an email.</summary>
         Task<EmailOtp?> GetActiveOtpAsync(string email, CancellationToken ct = default);
 
+        Task<EmailOtp?> GetLatestByEmailAsync(string email, CancellationToken ct = default);
+
         /// <summary>Marks an OTP as used.</summary>
         Task MarkUsedAsync(Guid otpId, CancellationToken ct = default);
 
