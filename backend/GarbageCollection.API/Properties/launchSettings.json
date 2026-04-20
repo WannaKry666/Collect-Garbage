@@ -1,6 +1,5 @@
 {
   "profiles": {
-<<<<<<< HEAD
     "GarbageCollection.API": {
       "commandName": "Project",
       "launchBrowser": true,
@@ -11,14 +10,3 @@
     }
   }
 }
-=======
-    "http": {
-      "commandName": "Project",
-      "applicationUrl": "http://localhost:5000",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    }
-  }
-}
->>>>>>> d996f63 (feat: add Cancel (delete) citizen report)
