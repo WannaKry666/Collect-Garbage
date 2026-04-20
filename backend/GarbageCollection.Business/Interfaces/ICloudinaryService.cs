@@ -18,5 +18,10 @@ namespace GarbageCollection.Business.Interfaces
         /// Xóa ảnh khỏi Cloudinary theo publicId.
         /// </summary>
         Task DeleteImageAsync(string publicId);
+
+        /// <summary>
+        /// Xóa nhiều ảnh theo danh sách URL Cloudinary.
+        /// </summary>
+        Task DeleteImagesAsync(IList<string> imageUrls);
     }
 }

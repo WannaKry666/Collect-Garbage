@@ -1,7 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using GarbageCollection.Business.Helpers;
 using GarbageCollection.Common.DTOs;
 using GarbageCollection.Common.DTOs.User;
 using GarbageCollection.Business.Interfaces;
+using GarbageCollection.DataAccess.Interfaces;
 
 namespace GarbageCollection.API.Controllers
 {
@@ -9,26 +12,111 @@ namespace GarbageCollection.API.Controllers
     public class UsersController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly ICitizenRepository _citizenRepository;
 
-        public UsersController(IUserService userService)
+        public UsersController(IUserService userService, ICitizenRepository citizenRepository)
         {
-            _userService = userService;
+            _userService       = userService;
+            _citizenRepository = citizenRepository;
         }
 
         /// <summary>
         /// Lấy thông tin profile của citizen đang đăng nhập.
         /// </summary>
+        [Authorize]
         [HttpGet("/api/v1/users/profile")]
         [ProducesResponseType(typeof(ApiResponse<UserProfileDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetProfile()
         {
-            var citizenId = GetCurrentCitizenId();
+            var (citizenId, authErr) = await GetAuthorizedCitizenAsync();
+            if (authErr is not null) return authErr;
+
             var result = await _userService.GetProfileAsync(citizenId);
             return Ok(ApiResponse<UserProfileDto>.Ok(result, "get user profile successfully"));
         }
 
-        // TODO: thay bằng JWT claim sau khi có auth
-        private static int GetCurrentCitizenId() => 1;
+        /// <summary>
+        /// Cập nhật thông tin profile của citizen đang đăng nhập.
+        /// </summary>
+        [Authorize]
+        [HttpPut("/api/v1/users/profile")]
+        [ProducesResponseType(typeof(ApiResponse<UserProfileDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status422UnprocessableEntity)]
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateUserProfileRequest request)
+        {
+            if (!ModelState.IsValid)
+                return UnprocessableEntity(ApiResponse<object>.Fail("invalid input data", "INVALID_INPUT"));
+
+            var (citizenId, authErr) = await GetAuthorizedCitizenAsync();
+            if (authErr is not null) return authErr;
+
+            var result = await _userService.UpdateProfileAsync(citizenId, request.Data);
+            return Ok(ApiResponse<UserProfileDto>.Ok(result, "update user profile successfully"));
+        }
+
+        /// <summary>
+        /// Đổi mật khẩu. Cấp lại accessToken mới qua cookie sau khi đổi thành công.
+        /// </summary>
+        [Authorize]
+        [HttpPut("/api/v1/users/profile/change-password")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status422UnprocessableEntity)]
+        public async Task<IActionResult> ChangePassword(
+            [FromBody] ChangePasswordRequest request,
+            CancellationToken ct)
+        {
+            if (!ModelState.IsValid)
+                return UnprocessableEntity(ApiResponse<object>.Fail("invalid input data", "INVALID_INPUT"));
+
+            var email = User.GetEmail();
+            if (email is null)
+                return Unauthorized(ApiResponse<object>.Fail("unauthorized", "UNAUTHORIZED"));
+
+            string newAccessToken;
+            try
+            {
+                newAccessToken = await _userService.ChangePasswordAsync(email, request.Data, ct);
+            }
+            catch (ArgumentException ex) when (ex.Message.Contains("old password is incorrect"))
+            {
+                return BadRequest(ApiResponse<object>.Fail(ex.Message, "INVALID_OLD_PASSWORD"));
+            }
+            catch (ArgumentException ex) when (ex.Message.Contains("new password must be different"))
+            {
+                return BadRequest(ApiResponse<object>.Fail(ex.Message, "SAME_PASSWORD"));
+            }
+            catch (ArgumentException ex)
+            {
+                return UnprocessableEntity(ApiResponse<object>.Fail("invalid password format", "INVALID_PASSWORD_FORMAT", ex.Message));
+            }
+
+            // Set new access token cookie
+            Response.Cookies.Append("accessToken", newAccessToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure   = true,
+                SameSite = SameSiteMode.Strict,
+                Expires  = DateTime.UtcNow.AddMinutes(15)
+            });
+
+            return Ok(ApiResponse<object>.Ok(null!, "password updated successfully"));
+        }
+
+        private async Task<(int Id, IActionResult? Error)> GetAuthorizedCitizenAsync()
+        {
+            var email = User.GetEmail();
+            if (email is null)
+                return (0, Unauthorized(ApiResponse<object>.Fail("unauthorized", "UNAUTHORIZED")));
+
+            var citizen = await _citizenRepository.GetByEmailAsync(email);
+            if (citizen is null)
+                return (0, NotFound(ApiResponse<object>.Fail("account not found", "NOT_FOUND")));
+
+            return (citizen.Id, null);
+        }
     }
 }

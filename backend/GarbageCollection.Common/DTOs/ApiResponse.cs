@@ -15,6 +15,9 @@ namespace GarbageCollection.Common.DTOs
             Error = null
         };
 
+        // Alias dùng bởi AuthController (message trước, data sau)
+        public static ApiResponse<T> Success(string message, T data) => Ok(data, message);
+
         public static ApiResponse<T> Fail(string message, string code = "ERROR", string? description = null) => new()
         {
             Status = "failed",
